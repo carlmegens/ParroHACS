@@ -1,0 +1,16 @@
+{
+  "domain": "parro",
+  "name": "Parro",
+  "codeowners": [
+    "@carlmegens"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/carlmegens/ParroHACS",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/carlmegens/ParroHACS/issues",
+  "requirements": [
+    "parro==1.1.0"
+  ],
+  "version": "0.1.0"
+}

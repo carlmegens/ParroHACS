@@ -1,0 +1,40 @@
+{
+  "entity": {
+    "sensor": {
+      "children_count": {
+        "default": "mdi:account-child"
+      },
+      "groups_count": {
+        "default": "mdi:account-group"
+      },
+      "unread_announcements": {
+        "default": "mdi:bullhorn"
+      },
+      "unread_chatrooms": {
+        "default": "mdi:message-badge-outline"
+      },
+      "last_success": {
+        "default": "mdi:clock-check-outline"
+      }
+    },
+    "binary_sensor": {
+      "connectivity": {
+        "default": "mdi:cloud-check-outline"
+      }
+    }
+  },
+  "services": {
+    "get_announcements": {
+      "service": "mdi:download"
+    },
+    "get_chatrooms": {
+      "service": "mdi:download"
+    },
+    "get_messages": {
+      "service": "mdi:download"
+    },
+    "get_calendar_urls": {
+      "service": "mdi:download"
+    }
+  }
+}

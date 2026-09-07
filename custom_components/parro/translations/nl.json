@@ -1,0 +1,148 @@
+{
+  "title": "Parro",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Aanmelden bij Parro",
+        "description": "Gebruik je ParnasSys-account. Je wachtwoord wordt alleen tijdens het aanmelden gebruikt; Home Assistant bewaart de verkregen tokens.",
+        "data": {
+          "username": "E-mailadres",
+          "password": "Wachtwoord"
+        }
+      },
+      "account": {
+        "title": "Kies je account",
+        "description": "Selecteer de ParnasSys-identiteit die je wilt koppelen. Voeg de integratie nogmaals toe voor een andere identiteit.",
+        "data": {
+          "account_id": "Account"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Opnieuw aanmelden",
+        "description": "Je Parro-sessie is verlopen. Meld je aan met hetzelfde account om opnieuw verbinding te maken."
+      }
+    },
+    "error": {
+      "invalid_auth": "Aanmelden mislukt. Controleer je e-mailadres en wachtwoord.",
+      "cannot_connect": "Parro is niet bereikbaar. Probeer het later opnieuw.",
+      "unsupported_response": "Parro gaf een niet-ondersteund antwoord. Controleer of er een update voor de integratie is."
+    },
+    "abort": {
+      "already_configured": "Dit Parro-account is al ingesteld.",
+      "reauth_successful": "De aanmelding is vernieuwd.",
+      "session_expired": "De aanmeldsessie is verlopen. Begin opnieuw.",
+      "unique_id_mismatch": "Meld je aan met het account dat al aan deze integratie is gekoppeld."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ophaalinterval",
+        "description": "Hoe vaak Home Assistant de compacte accountstatus ophaalt (15–240 minuten). Berichtinhoud wordt alleen opgehaald wanneer je een leesactie uitvoert.",
+        "data": {
+          "poll_interval": "Ophaalinterval (minuten)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "children_count": {
+        "name": "Kinderen"
+      },
+      "groups_count": {
+        "name": "Groepen"
+      },
+      "unread_announcements": {
+        "name": "Ongelezen mededelingen"
+      },
+      "unread_chatrooms": {
+        "name": "Gesprekken met ongelezen berichten"
+      },
+      "last_success": {
+        "name": "Laatste geslaagde synchronisatie"
+      }
+    },
+    "binary_sensor": {
+      "connectivity": {
+        "name": "Verbinding"
+      }
+    }
+  },
+  "exceptions": {
+    "account_not_loaded": {
+      "message": "Selecteer een geladen Parro-configuratie."
+    },
+    "authentication_expired": {
+      "message": "De Parro-sessie is verlopen. Meld je opnieuw aan via de integratie-instellingen."
+    },
+    "cannot_connect": {
+      "message": "Parro is niet bereikbaar. Probeer het later opnieuw."
+    },
+    "unsupported_response": {
+      "message": "Parro gaf een niet-ondersteund antwoord."
+    }
+  },
+  "services": {
+    "get_announcements": {
+      "name": "Mededelingen ophalen",
+      "description": "Haal een begrensde selectie schoolmededelingen op. Alleen voor beheerders en automatiseringen. Het antwoord kan privé-schoolinformatie bevatten en in automatiseringssporen worden opgeslagen.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Account",
+          "description": "Selecteer het gekoppelde Parro-account."
+        },
+        "limit": {
+          "name": "Maximum",
+          "description": "Maximum aantal resultaten (1–50); dit is geen volledige export."
+        }
+      }
+    },
+    "get_chatrooms": {
+      "name": "Gesprekken ophalen",
+      "description": "Haal een begrensde selectie gesprekken op, zonder de berichten. Alleen voor beheerders en automatiseringen. Het antwoord kan privé-schoolinformatie bevatten en in automatiseringssporen worden opgeslagen.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Account",
+          "description": "Selecteer het gekoppelde Parro-account."
+        },
+        "limit": {
+          "name": "Maximum",
+          "description": "Maximum aantal resultaten (1–50); dit is geen volledige export."
+        }
+      }
+    },
+    "get_messages": {
+      "name": "Berichten ophalen",
+      "description": "Haal een begrensde selectie berichten uit één gesprek op. Alleen voor beheerders en automatiseringen. Het antwoord kan privé-schoolinformatie bevatten en in automatiseringssporen worden opgeslagen.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Account",
+          "description": "Selecteer het gekoppelde Parro-account."
+        },
+        "limit": {
+          "name": "Maximum",
+          "description": "Maximum aantal resultaten (1–50); dit is geen volledige export."
+        },
+        "chatroom_id": {
+          "name": "Gespreks-ID",
+          "description": "Gebruik de id uit het antwoord van get_chatrooms."
+        }
+      }
+    },
+    "get_calendar_urls": {
+      "name": "Agenda-URL’s ophalen",
+      "description": "Haal een begrensde selectie privé-URL’s voor agenda-abonnementen op. Alleen voor beheerders en automatiseringen. Het antwoord kan privé-schoolinformatie bevatten en in automatiseringssporen worden opgeslagen.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Account",
+          "description": "Selecteer het gekoppelde Parro-account."
+        },
+        "limit": {
+          "name": "Maximum",
+          "description": "Maximum aantal resultaten (1–50); dit is geen volledige export."
+        }
+      }
+    }
+  }
+}

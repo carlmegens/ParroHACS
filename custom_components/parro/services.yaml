@@ -1,0 +1,65 @@
+get_announcements:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: parro
+    limit:
+      default: 20
+      selector:
+        number:
+          min: 1
+          max: 50
+          step: 1
+          mode: box
+get_chatrooms:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: parro
+    limit:
+      default: 20
+      selector:
+        number:
+          min: 1
+          max: 50
+          step: 1
+          mode: box
+get_messages:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: parro
+    limit:
+      default: 20
+      selector:
+        number:
+          min: 1
+          max: 50
+          step: 1
+          mode: box
+    chatroom_id:
+      required: true
+      example: "123"
+      selector:
+        text:
+get_calendar_urls:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: parro
+    limit:
+      default: 20
+      selector:
+        number:
+          min: 1
+          max: 50
+          step: 1
+          mode: box

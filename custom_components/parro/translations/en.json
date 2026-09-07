@@ -1,0 +1,148 @@
+{
+  "title": "Parro",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Sign in to Parro",
+        "description": "Use your ParnasSys account. Your password is used only during sign-in; Home Assistant stores the resulting tokens.",
+        "data": {
+          "username": "Email address",
+          "password": "Password"
+        }
+      },
+      "account": {
+        "title": "Choose your account",
+        "description": "Select the ParnasSys identity to connect. Add the integration again to connect another identity.",
+        "data": {
+          "account_id": "Account"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Sign in again",
+        "description": "Your Parro session has expired. Sign in with the same account to reconnect."
+      }
+    },
+    "error": {
+      "invalid_auth": "Sign-in failed. Check your email address and password.",
+      "cannot_connect": "Unable to reach Parro. Try again later.",
+      "unsupported_response": "Parro returned an unsupported response. Check for an integration update."
+    },
+    "abort": {
+      "already_configured": "This Parro account is already configured.",
+      "reauth_successful": "Sign-in updated successfully.",
+      "session_expired": "The sign-in session has expired. Start again.",
+      "unique_id_mismatch": "Sign in with the account already connected to this integration."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Polling interval",
+        "description": "How often Home Assistant fetches the compact account summary (15–240 minutes). Message content is fetched only when you call a read action.",
+        "data": {
+          "poll_interval": "Polling interval (minutes)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "children_count": {
+        "name": "Children"
+      },
+      "groups_count": {
+        "name": "Groups"
+      },
+      "unread_announcements": {
+        "name": "Unread announcements"
+      },
+      "unread_chatrooms": {
+        "name": "Conversations with unread messages"
+      },
+      "last_success": {
+        "name": "Last successful synchronization"
+      }
+    },
+    "binary_sensor": {
+      "connectivity": {
+        "name": "Connection"
+      }
+    }
+  },
+  "exceptions": {
+    "account_not_loaded": {
+      "message": "Select a loaded Parro configuration entry."
+    },
+    "authentication_expired": {
+      "message": "The Parro session has expired. Sign in again from the integration settings."
+    },
+    "cannot_connect": {
+      "message": "Unable to reach Parro. Try again later."
+    },
+    "unsupported_response": {
+      "message": "Parro returned an unsupported response."
+    }
+  },
+  "services": {
+    "get_announcements": {
+      "name": "Get announcements",
+      "description": "Fetch a bounded selection of school announcements. Administrators and automations only. The response can contain private school information and may be stored in automation traces.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Account",
+          "description": "Select the connected Parro account."
+        },
+        "limit": {
+          "name": "Limit",
+          "description": "Maximum returned items (1–50); this is not a complete export."
+        }
+      }
+    },
+    "get_chatrooms": {
+      "name": "Get conversations",
+      "description": "Fetch a bounded selection of conversations, without their messages. Administrators and automations only. The response can contain private school information and may be stored in automation traces.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Account",
+          "description": "Select the connected Parro account."
+        },
+        "limit": {
+          "name": "Limit",
+          "description": "Maximum returned items (1–50); this is not a complete export."
+        }
+      }
+    },
+    "get_messages": {
+      "name": "Get messages",
+      "description": "Fetch a bounded selection of messages from one conversation. Administrators and automations only. The response can contain private school information and may be stored in automation traces.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Account",
+          "description": "Select the connected Parro account."
+        },
+        "limit": {
+          "name": "Limit",
+          "description": "Maximum returned items (1–50); this is not a complete export."
+        },
+        "chatroom_id": {
+          "name": "Conversation ID",
+          "description": "Use the id returned by get_chatrooms."
+        }
+      }
+    },
+    "get_calendar_urls": {
+      "name": "Get calendar URLs",
+      "description": "Fetch a bounded selection of private calendar subscription URLs. Administrators and automations only. The response can contain private school information and may be stored in automation traces.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Account",
+          "description": "Select the connected Parro account."
+        },
+        "limit": {
+          "name": "Limit",
+          "description": "Maximum returned items (1–50); this is not a complete export."
+        }
+      }
+    }
+  }
+}
