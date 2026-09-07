@@ -6,9 +6,9 @@ Een eigen, onofficiële Home Assistant-integratie voor compacte schoolstatus en 
 
 Opent deze repository in HACS. HACS moet al geïnstalleerd zijn in je Home Assistant.
 
-**Versie 0.1.1 bevat een correctie voor het aanmeldproces.** Downloaden en installeren van de eerdere versie via HACS zijn bevestigd; aanmelden met een echt Parro-account is nog niet geslaagd. De correctie vereist een nieuwe aanmeldproef en is nog geen bevestiging van de oorzaak van de eerdere mislukte aanmelding.
+**Versie 0.1.2 verbetert de afhandeling van de terugkeer uit het aanmeldscherm.** De nieuwe aanmeldpoging met 0.1.1 mislukte nog met `state_mismatch`. Installatie via HACS is bevestigd; een geslaagde accountaanmelding nog niet. Versie 0.1.2 vereist opnieuw een live aanmeldproef.
 
-Lokale controle van 0.1.1: **170 tests geslaagd** met Home Assistant Core 2026.8.3 en een gemockte Parro-server. De Ruff-codecontrole is geslaagd. De tests controleren de aanmeld-, installatie-, leesactie- en tokenverversingsketen; een geslaagde aanmelding met een echt account moet nog worden bevestigd. De [wijzigingen](CHANGELOG.md) beschrijven de aanmeldcorrectie en de [releasechecklist](RELEASE_CHECKLIST.md) houdt de resterende controles bij.
+Versie 0.1.2 is lokaal gecontroleerd met **200 geslaagde tests** op Home Assistant Core 2026.8.3 en een gemockte Parro-server. Code- en formatteringscontroles slagen. De [wijzigingen](CHANGELOG.md) beschrijven de aanvullende correctie en haar bron; de [releasechecklist](RELEASE_CHECKLIST.md) houdt de controles bij. De eerder gevonden fout in 0.1.1 en de nieuwe correctie bewijzen niet welke aanmeldroute de praktijkproef precies volgde.
 
 ## Vereisten
 
@@ -47,7 +47,7 @@ De gekozen identiteit wordt na aanmelding gekoppeld aan de echte account-ID van 
 
 De integratie ververst tokens automatisch en probeert een lezing na een 401 eenmaal opnieuw na tokenverversing. Een wijziging van tokens veroorzaakt geen herlaadlus.
 
-Vanaf 0.1.1 blijft de oorspronkelijke beveiligingscontrole van de aanmelding behouden wanneer de aanmeldserver een tussenstap zonder nieuwe `state` hervat. Een later aangeboden afwijkende `state` wordt afgewezen. Technische fouten tijdens de aanmeldflow krijgen een andere melding dan geweigerde aanmeldgegevens.
+De oorspronkelijke OAuth-`state` blijft behouden wanneer de aanmeldserver een tussenstap zonder nieuwe waarde hervat. Versie 0.1.2 accepteert daarnaast de callbackvorm met poort 443 en een afsluitende slash die in de tests van de vastgezette Parro-SDK voorkomt. De teruggegeven `state` moet nog steeds exact overeenkomen; een later aangeboden afwijkende waarde wordt afgewezen. Technische fouten tijdens de aanmeldflow krijgen een andere melding dan geweigerde aanmeldgegevens.
 
 Via **Configureren** bij de integratie kun je het ophaalinterval wijzigen. Standaard is dit **30 minuten**; toegestaan is **15 tot en met 240 minuten**. Dit interval staat los van eventuele verversing van een dashboard of scherm.
 
@@ -106,7 +106,7 @@ Periodieke synchronisatie leest geen chatinhoud. Deze versie biedt geen verzende
 
 - **Parro verschijnt niet bij integraties:** controleer de mapstructuur en herstart Home Assistant. Controleer dat Core aan de minimumversie voldoet en de afhankelijkheid kon worden geïnstalleerd.
 - **Aanmeldgegevens geweigerd:** controleer het account via Parro zelf. Deze integratie gebruikt een gebruikersnaam/wachtwoordflow; andere aanmeldvarianten zijn niet live gevalideerd.
-- **Technische fout tijdens aanmelden:** werk via HACS bij naar 0.1.1 of nieuwer, herstart Home Assistant en begin een nieuwe aanmelding via **Integratie toevoegen → Parro**. Deze fout betekent niet automatisch dat het wachtwoord onjuist is. De integratie logt hiervoor uitsluitend een vaste technische foutcategorie, zonder aanmeldgegevens of de inhoud van serverantwoorden.
+- **Technische fout tijdens aanmelden:** werk via HACS bij naar 0.1.2 of nieuwer, herstart Home Assistant en begin een nieuwe aanmelding via **Integratie toevoegen → Parro**. Deze fout betekent niet automatisch dat het wachtwoord onjuist is. De integratie logt hiervoor uitsluitend een vaste technische foutcategorie, zonder aanmeldgegevens of de inhoud van serverantwoorden.
 - **Verbinding uit of tellers niet beschikbaar:** wacht op de volgende synchronisatie of herlaad de integratie eenmaal. Bij een authenticatieprobleem biedt Home Assistant heraanmelding aan.
 - **Verkeerde identiteit bij heraanmelding:** kies dezelfde Parro-identiteit. Voeg een ander account toe als aparte integratie.
 - **Een leesactie faalt:** kies een geladen Parro-config entry en controleer de grenzen van `limit` en `chatroom_id`.
@@ -121,7 +121,7 @@ Voer onderstaande opdrachten uit vanuit de root van deze integratie. Voor de tes
 python3.14 -m venv .venv
 .venv/bin/python -m pip install -r requirements-test.txt
 .venv/bin/python -m pytest -q
-.venv/bin/python scripts/prepare_repository.py --local-archive dist/parro-0.1.1-local.zip
+.venv/bin/python scripts/prepare_repository.py --local-archive dist/parro-0.1.2-local.zip
 ```
 
 De helper weigert bestaande uitvoer te overschrijven. Kies bij opnieuw bouwen een nieuwe ZIP-naam of verwijder bewust alleen een eerdere, zelf gemaakte ZIP en bijbehorende inventaris. De testbestanden en testafhankelijkheden staan in de repository; het installatiepakket bevat uitsluitend de integratie en expliciet toegestane documentatie. De meegeleverde SDK wordt bij installatie opgehaald en is niet in het pakket gekopieerd.

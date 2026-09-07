@@ -47,7 +47,15 @@ def server(monkeypatch):
     return state
 
 
-def login_server(server, *, choices=None, wrong_state=False, action="/login"):
+def login_server(
+    server,
+    *,
+    choices=None,
+    wrong_state=False,
+    action="/login",
+    callback_base="parro://oauth2",
+    chooser_response="header",
+):
     state = {}
 
     def handler(request):
@@ -68,15 +76,19 @@ def login_server(server, *, choices=None, wrong_state=False, action="/login"):
             received_state = "wrong-state" if wrong_state else state["oauth_state"]
             return httpx.Response(
                 302,
-                headers={"location": f"parro://oauth2?code=synthetic-code&state={received_state}"},
+                headers={"location": f"{callback_base}?code=synthetic-code&state={received_state}"},
             )
         if "accountKeuze-accounts-account-" in request.url.path:
             state["chosen_name"] = choices[int(request.url.path.rsplit("-", 1)[-1])][0]
+            location = f"{callback_base}?code=synthetic-code&state={state['oauth_state']}"
+            if chooser_response == "xml":
+                return httpx.Response(
+                    200,
+                    text=f"<ajax-response><redirect><![CDATA[{location}]]></redirect></ajax-response>",
+                )
             return httpx.Response(
                 200,
-                headers={
-                    "Ajax-Location": f"parro://oauth2?code=synthetic-code&state={state['oauth_state']}"
-                },
+                headers={"Ajax-Location": location},
             )
         if request.url.path == "/idp/oauth2/token":
             state["token_request"] = parse_qs(request.content.decode())
@@ -136,6 +148,35 @@ async def test_account_choice_exact_stable_selector_then_real_account_id(hass, s
     assert state["chosen_name"] == "Guardian Alpha"
     assert result.account_id == "81"
     assert result.account_id != selected
+
+
+@pytest.mark.parametrize("chooser_response", ["header", "xml"])
+async def test_upstream_chooser_callback_with_https_port_and_root_path(
+    hass, server, chooser_response
+):
+    """Pinned SDK1.1.0 test_login.py models this callback target for a chooser."""
+    state = login_server(
+        server,
+        choices=[("Synthetic Guardian", "Ouder")],
+        callback_base="parro://oauth2:443/",
+        chooser_response=chooser_response,
+    )
+    with pytest.raises(ParroAccountSelectionRequired) as selection:
+        await async_login(hass, "synthetic@example.invalid", "synthetic-password")
+    result = await async_login(
+        hass,
+        "synthetic@example.invalid",
+        "synthetic-password",
+        selection.value.accounts[0]["id"],
+    )
+    assert result.account_id == "81"
+    assert state["token_request"]["code"] == ["synthetic-code"]
+
+
+async def test_direct_callback_accepts_same_documented_target(hass, server):
+    login_server(server, callback_base="parro://oauth2:443/")
+    result = await async_login(hass, "synthetic@example.invalid", "synthetic-password")
+    assert result.account_id == "81"
 
 
 async def test_ambiguous_account_choices_fail_closed(hass, server):

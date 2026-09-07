@@ -4,11 +4,13 @@ from unittest.mock import patch
 from urllib.parse import parse_qs
 
 import httpx
+import pytest
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.data_entry_flow import FlowResultType
 
 
-async def test_login_setup_action_refresh_and_unload_against_http_server(hass):
+@pytest.mark.parametrize("callback_base", ["parro://oauth2", "parro://oauth2:443/"])
+async def test_login_setup_action_refresh_and_unload_against_http_server(hass, callback_base):
     requests = []
     state = None
 
@@ -27,7 +29,7 @@ async def test_login_setup_action_refresh_and_unload_against_http_server(hass):
             assert data["emailadres"] == ["synthetic@example.invalid"]
             assert data["wachtwoord"] == ["synthetic-password"]
             return httpx.Response(
-                302, headers={"location": f"parro://oauth2?code=synthetic&state={state}"}
+                302, headers={"location": f"{callback_base}?code=synthetic&state={state}"}
             )
         if path == "/idp/oauth2/token":
             data = parse_qs(request.content.decode())

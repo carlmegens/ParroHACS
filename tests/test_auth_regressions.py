@@ -104,6 +104,62 @@ def test_callback_rejects_duplicate_blank_or_missing_state(query):
 
 
 @pytest.mark.parametrize(
+    "callback_base",
+    ["parro://oauth2", "parro://oauth2/", "parro://oauth2:443", "parro://oauth2:443/"],
+)
+def test_documented_callback_targets_accept_exact_original_state(callback_base):
+    _check_state(f"{callback_base}?code=synthetic-code&state=original", "original")
+
+
+@pytest.mark.parametrize(
+    "callback_base",
+    [
+        "https://oauth2/",
+        "parro://other-host/",
+        "parro://oauth2.example.invalid/",
+        "parro://oauth2:80/",
+        "parro://oauth2:444/",
+        "parro://oauth2:not-a-port/",
+        "parro://oauth2:65536/",
+        "parro://synthetic-user@oauth2/",
+        "parro://synthetic-user:synthetic-password@oauth2:443/",
+        "parro://@oauth2/",
+        "parro://oauth2/another-path",
+        "parro://oauth2//",
+        "parro://[oauth2/",
+    ],
+)
+def test_callback_rejects_other_destinations_without_echoing_them(callback_base):
+    with pytest.raises(ParroLoginFlowError) as error:
+        _check_state(f"{callback_base}?code=synthetic-code&state=original", "original")
+    assert str(error.value) == error.value.reason == "callback_invalid_destination"
+
+
+@pytest.mark.parametrize("fragment", ["#", "#synthetic-secret", "#state=original"])
+def test_callback_rejects_fragment_even_with_valid_query_state(fragment):
+    with pytest.raises(ParroLoginFlowError, match="callback_invalid_destination"):
+        _check_state(
+            f"parro://oauth2:443/?code=synthetic-code&state=original{fragment}", "original"
+        )
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "state=wrong",
+        "state=original&state=original",
+        "state=original&state=",
+        "state=&state=original",
+        "state=",
+        "",
+    ],
+)
+def test_documented_callback_variant_still_rejects_unbound_state(query):
+    with pytest.raises(ParroLoginFlowError, match="state_mismatch"):
+        _check_state(f"parro://oauth2:443/?code=synthetic-code&{query}", "original")
+
+
+@pytest.mark.parametrize(
     "message,reason",
     [
         (

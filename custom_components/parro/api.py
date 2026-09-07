@@ -45,6 +45,7 @@ class ParroLoginFlowError(ParroError):
     REASONS = frozenset(
         {
             "state_mismatch",
+            "callback_invalid_destination",
             "login_not_completed",
             "token_exchange_failed",
             "unexpected_destination",
@@ -313,15 +314,26 @@ def _sdk_module() -> ModuleType:
 
 
 def _check_state(location: str, expected: str | None) -> None:
-    parsed = urlparse(location)
-    values = parse_qs(parsed.query, keep_blank_values=True)
+    """Accept documented callback target variants; preserve exact state binding."""
+    try:
+        parsed = urlparse(location)
+        port = parsed.port
+    except ValueError:
+        raise ParroLoginFlowError("callback_invalid_destination") from None
+    # The pinned SDK's chooser fixture uses parro://oauth2:443/. The port and
+    # root slash do not change the callback identity; other targets are refused.
     if (
         parsed.scheme != "parro"
-        or parsed.netloc != "oauth2"
-        or parsed.path
-        or not expected
-        or values.get("state") != [expected]
+        or parsed.hostname != "oauth2"
+        or port not in (None, 443)
+        or parsed.path not in ("", "/")
+        or parsed.username is not None
+        or parsed.password is not None
+        or "#" in location
     ):
+        raise ParroLoginFlowError("callback_invalid_destination")
+    values = parse_qs(parsed.query, keep_blank_values=True)
+    if not expected or values.get("state") != [expected]:
         raise ParroLoginFlowError("state_mismatch")
 
 
