@@ -1,6 +1,6 @@
 # Releasechecklist 0.1.0
 
-De eerste versie is lokaal gecontroleerd en bedoeld voor publicatie in `carlmegens/ParroHACS`. Accountproef, hostinstallatie en HACS-downloadproef zijn nog niet uitgevoerd. De publicatiecontrole hieronder is ook bruikbaar voor volgende versies. Vul na een proef alleen technische uitkomsten in, zonder namen, schoolinformatie, tokens of privé-URL's.
+De eerste versie is lokaal gecontroleerd en gepubliceerd in `carlmegens/ParroHACS`. Accountproef, hostinstallatie en HACS-downloadproef zijn nog niet uitgevoerd. De publicatiecontrole hieronder is ook bruikbaar voor volgende versies. Vul na een proef alleen technische uitkomsten in, zonder namen, schoolinformatie, tokens of privé-URL's.
 
 ## Lokale kandidaat
 
@@ -21,12 +21,12 @@ De eerste versie is lokaal gecontroleerd en bedoeld voor publicatie in `carlmege
 - [ ] Controleren dat sensorattributen en diagnostiek geen berichtinhoud, kindnamen of privé-URL's bevatten.
 - [ ] Verwijderen, herladen en handmatig bijwerken controleren.
 
-## HACS-publicatie, pas na afzonderlijke publicatiebeslissing
+## HACS-publicatie
 
 - [x] GitHub-eigenaar `carlmegens`, repository `ParroHACS` en codeowner `@carlmegens` vastgelegd; de repository is openbaar.
-- [ ] Stagingmap maken met de expliciete waarden en `scripts/prepare_repository.py --check` daarop uitvoeren.
-- [ ] Staginginhoud, licentie, pakketinhoud en resterende beperkingen beoordelen.
-- [ ] Na toestemming alleen de gecontroleerde stagingmap publiceren als aparte repository; beschrijving en relevante GitHub-topics toevoegen.
+- [x] Stagingmap gemaakt met de expliciete waarden; tests, codecontrole en `scripts/prepare_repository.py --check` geslaagd.
+- [x] Staginginhoud, licentie, pakketinhoud en resterende beperkingen beoordeeld; openbare bron bevat uitsluitend de integratie, documentatie en synthetische tests.
+- [x] Gecontroleerde bestanden gepubliceerd op `main` in de door de gebruiker gekozen repository; beschrijving en relevante GitHub-topics aanwezig. Alle 35 gepubliceerde bestanden gecontroleerd tegen de lokale bron.
 - [ ] HACS-validatie en installatie als aangepaste repository testen.
 - [ ] Desgewenst een GitHub-release `v0.1.0` publiceren. `hacs.json` gebruikt repositorybestanden en geen ZIP-release.
 - [ ] README en wijzigingen bijwerken met uitsluitend daadwerkelijk uitgevoerde proeven en ondersteunde versies.
