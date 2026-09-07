@@ -2,6 +2,10 @@
 
 Een eigen, onofficiële Home Assistant-integratie voor compacte schoolstatus en het op verzoek lezen van Parro-informatie. Aanmelden en accountkeuze gaan via de Home Assistant-interface. Een aparte app, MQTT-brug of browserextensie is niet nodig.
 
+[![Open Parro in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=carlmegens&repository=ParroHACS&category=integration)
+
+Opent deze repository in HACS. HACS moet al geïnstalleerd zijn in je Home Assistant.
+
 **Versie 0.1.0 is een eerste testversie.** De automatische tests gebruiken Home Assistant Core 2026.8.3 en een gemockte Parro-server. Aanmelden met een echt Parro-account, installatie op een Home Assistant-host en downloaden via HACS zijn nog niet live beproefd.
 
 Lokale controle op 7 september 2026: **142 tests geslaagd**, inclusief de volledige aanmeld-, installatie-, leesactie- en tokenverversingsketen binnen de Home Assistant-testomgeving. Codecontrole en controle van de actie-interface en vertalingen zijn geslaagd.
@@ -14,6 +18,8 @@ Lokale controle op 7 september 2026: **142 tests geslaagd**, inclusief de volled
 - Voor installatie via HACS: een gepubliceerde, openbare GitHub-repository met deze integratie. Voor de lokale ZIP is HACS niet nodig.
 
 ## Installeren via HACS
+
+Met de knop hierboven open je Parro rechtstreeks in HACS. Handmatig toevoegen kan ook:
 
 1. Open HACS, kies het menu met de drie puntjes en **Aangepaste repositories / Custom repositories**.
 2. Voeg **https://github.com/carlmegens/ParroHACS** toe, met type **Integratie / Integration**.
