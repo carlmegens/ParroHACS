@@ -12,6 +12,7 @@ from custom_components.parro.api import (
     ParroAuthError,
     ParroConnectionError,
     ParroError,
+    ParroLoginFlowError,
 )
 
 CREDENTIALS = {CONF_USERNAME: " parent@example.invalid ", CONF_PASSWORD: "synthetic-password"}
@@ -78,6 +79,7 @@ async def test_multiple_accounts_requires_choice_before_entry(hass):
         (ParroAuthError("private upstream body"), "invalid_auth"),
         (ParroConnectionError("private upstream URL"), "cannot_connect"),
         (ParroError("private unexpected payload"), "unsupported_response"),
+        (ParroLoginFlowError("state_mismatch"), "login_flow_failed"),
     ],
 )
 async def test_auth_failure_safe_error_and_retry(hass, error, reason):
@@ -90,6 +92,24 @@ async def test_auth_failure_safe_error_and_retry(hass, error, reason):
     assert flow._credentials == {}
     assert flow._accounts == []
     assert "private" not in str(result)
+
+
+async def test_login_flow_failure_logs_only_safe_reason(hass, caplog):
+    result = await start(hass)
+    with patch(
+        "custom_components.parro.config_flow.async_login",
+        side_effect=ParroLoginFlowError("login_not_completed"),
+    ):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], CREDENTIALS)
+    assert result["errors"] == {"base": "login_flow_failed"}
+    records = [
+        record for record in caplog.records if record.name == "custom_components.parro.config_flow"
+    ]
+    assert len(records) == 1
+    assert records[0].getMessage() == "Parro sign-in could not finish (login_not_completed)"
+    assert records[0].exc_info is None
+    assert "parent@example.invalid" not in caplog.text
+    assert "synthetic-password" not in caplog.text
 
 
 async def test_duplicate_uses_account_id_not_email(hass, config_entry):

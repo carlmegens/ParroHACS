@@ -23,7 +23,8 @@
       }
     },
     "error": {
-      "invalid_auth": "Sign-in failed. Check your email address and password.",
+      "invalid_auth": "Parro rejected the sign-in. Check your email address and password.",
+      "login_flow_failed": "The Parro sign-in process could not be completed. Check for an integration update and try again. A diagnostic code is available in the Home Assistant logs.",
       "cannot_connect": "Unable to reach Parro. Try again later.",
       "unsupported_response": "Parro returned an unsupported response. Check for an integration update."
     },

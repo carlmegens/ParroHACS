@@ -23,7 +23,8 @@
       }
     },
     "error": {
-      "invalid_auth": "Aanmelden mislukt. Controleer je e-mailadres en wachtwoord.",
+      "invalid_auth": "Parro heeft de aanmelding afgewezen. Controleer je e-mailadres en wachtwoord.",
+      "login_flow_failed": "De aanmeldprocedure van Parro kon niet worden afgerond. Controleer of er een update voor de integratie is en probeer opnieuw. In het Home Assistant-logboek staat een foutcode voor onderzoek.",
       "cannot_connect": "Parro is niet bereikbaar. Probeer het later opnieuw.",
       "unsupported_response": "Parro gaf een niet-ondersteund antwoord. Controleer of er een update voor de integratie is."
     },

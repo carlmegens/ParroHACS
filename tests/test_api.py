@@ -15,6 +15,7 @@ from custom_components.parro.api import (
     ParroAuthError,
     ParroConnectionError,
     ParroError,
+    ParroLoginFlowError,
     async_login,
 )
 
@@ -139,7 +140,7 @@ async def test_account_choice_exact_stable_selector_then_real_account_id(hass, s
 
 async def test_ambiguous_account_choices_fail_closed(hass, server):
     login_server(server, choices=[("Same name", "Ouder"), ("Same name", "Ouder")])
-    with pytest.raises(ParroError, match="ambiguous"):
+    with pytest.raises(ParroLoginFlowError, match="unsupported_account_chooser"):
         await async_login(hass, "synthetic@example.invalid", "synthetic-password")
 
 
@@ -154,21 +155,21 @@ async def test_ambiguous_account_choices_fail_closed(hass, server):
 )
 async def test_credentials_never_posted_to_other_origins(hass, server, action):
     login_server(server, action=action)
-    with pytest.raises(ParroError, match="destination"):
+    with pytest.raises(ParroLoginFlowError, match="unexpected_destination"):
         await async_login(hass, "synthetic@example.invalid", "synthetic-password")
     assert len(server["requests"]) == 1
 
 
 async def test_oauth_state_must_match(hass, server):
     login_server(server, wrong_state=True)
-    with pytest.raises(ParroAuthError, match="state"):
+    with pytest.raises(ParroLoginFlowError, match="state_mismatch"):
         await async_login(hass, "synthetic@example.invalid", "synthetic-password")
     assert not any(request.url.path.endswith("/token") for request in server["requests"])
 
 
 async def test_login_redirects_bounded(hass, server):
     server["handler"] = lambda request: httpx.Response(302, headers={"location": "/endless"})
-    with pytest.raises(ParroError, match="Too many"):
+    with pytest.raises(ParroLoginFlowError, match="redirect_limit"):
         await async_login(hass, "synthetic@example.invalid", "synthetic-password")
     assert len(server["requests"]) == 40
 
@@ -187,6 +188,63 @@ async def test_login_http_errors_are_classified_before_parsing(hass, server, sta
     with pytest.raises(expected) as error:
         await async_login(hass, "synthetic@example.invalid", "synthetic-password")
     assert "private" not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    "path,response,reason",
+    [
+        (
+            "/idp/oauth2/authorize",
+            httpx.Response(200, text="An unexpected sign-in page with synthetic-secret"),
+            "unsupported_login_form",
+        ),
+        (
+            "/login",
+            httpx.Response(200, text='class="error"><input type="password">synthetic-secret'),
+            "login_not_completed",
+        ),
+        (
+            "/idp/oauth2/token",
+            httpx.Response(400, json={"error_description": "synthetic-secret-token"}),
+            "token_exchange_failed",
+        ),
+        (
+            "/idp/oauth2/token",
+            httpx.Response(401, json={"error_description": "synthetic-secret-token"}),
+            "token_exchange_failed",
+        ),
+        (
+            "/idp/oauth2/token",
+            httpx.Response(403, json={"error_description": "synthetic-secret-token"}),
+            "token_exchange_failed",
+        ),
+        (
+            "/idp/oauth2/token",
+            httpx.Response(200, json={"unexpected_token": "synthetic-secret-token"}),
+            "token_exchange_failed",
+        ),
+        (
+            "/idp/oauth2/token",
+            httpx.Response(200, json={"access_token": 123, "id_token": "synthetic-secret-token"}),
+            "token_exchange_failed",
+        ),
+    ],
+)
+async def test_login_protocol_failures_do_not_blame_credentials(
+    hass, server, caplog, path, response, reason
+):
+    login_server(server)
+    original = server["handler"]
+
+    def handler(request):
+        return response if request.url.path == path else original(request)
+
+    server["handler"] = handler
+    with pytest.raises(ParroLoginFlowError) as error:
+        await async_login(hass, "synthetic@example.invalid", "synthetic-password")
+    assert error.value.reason == reason
+    assert str(error.value) == reason
+    assert "synthetic-secret" not in caplog.text
 
 
 async def test_empty_credentials_never_prompt_or_read_environment(hass, server):

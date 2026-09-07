@@ -1,5 +1,6 @@
 """Set up Parro through Home Assistant, without saving a password."""
 
+import logging
 from typing import Any
 
 import voluptuous as vol
@@ -14,6 +15,7 @@ from .api import (
     ParroAuthError,
     ParroConnectionError,
     ParroError,
+    ParroLoginFlowError,
     async_login,
 )
 from .const import (
@@ -25,6 +27,8 @@ from .const import (
     MAX_POLL_INTERVAL,
     MIN_POLL_INTERVAL,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class ParroConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -73,6 +77,9 @@ class ParroConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         except ParroAccountSelectionRequired as err:
             self._accounts = err.accounts
             return await self.async_step_account()
+        except ParroLoginFlowError as err:
+            _LOGGER.warning("Parro sign-in could not finish (%s)", err.reason)
+            error = "login_flow_failed"
         except ParroAuthError:
             error = "invalid_auth"
         except ParroConnectionError:

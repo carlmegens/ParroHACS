@@ -39,6 +39,28 @@ class ParroConnectionError(ParroError):
     """The server could not be reached or is temporarily unavailable."""
 
 
+class ParroLoginFlowError(ParroError):
+    """A technical sign-in failure with a safe, finite diagnostic reason."""
+
+    REASONS = frozenset(
+        {
+            "state_mismatch",
+            "login_not_completed",
+            "token_exchange_failed",
+            "unexpected_destination",
+            "redirect_limit",
+            "unsupported_account_chooser",
+            "unsupported_login_form",
+        }
+    )
+
+    def __init__(self, reason: str) -> None:
+        if not isinstance(reason, str) or reason not in self.REASONS:
+            raise ValueError("Unsupported Parro login failure reason")
+        super().__init__(reason)
+        self.reason = reason
+
+
 class ParroAccountSelectionRequired(ParroError):
     """The IDP requires an explicit identity choice."""
 
@@ -56,20 +78,29 @@ class LoginResult:
     title: str
 
 
-def _error(err: Exception, *, login: bool = False) -> ParroError:
+def _error(err: Exception, *, login: bool = False, refresh: bool = False) -> ParroError:
     if isinstance(err, ParroError):
         return err
     if isinstance(err, httpx.HTTPStatusError):
         status = err.response.status_code
-        if status in (401, 403) or (login and status == 400):
-            return ParroAuthError("Parro sign-in has expired or was rejected")
         if status == 429 or status >= 500:
             return ParroConnectionError("Parro is temporarily unavailable")
+        if login and err.request.url.path == "/idp/oauth2/token":
+            return ParroLoginFlowError("token_exchange_failed")
+        if status in (401, 403) or (refresh and status == 400):
+            return ParroAuthError("Parro sign-in has expired or was rejected")
     if isinstance(err, httpx.RequestError):
         return ParroConnectionError("Unable to reach Parro")
     # SDK RuntimeErrors may contain credentials, account names, or token bodies.
-    if login and isinstance(err, RuntimeError) and str(err).startswith("Login mislukt"):
-        return ParroAuthError("Parro sign-in was rejected")
+    if login:
+        if isinstance(err, RuntimeError):
+            if str(err).startswith("Token exchange mislukt"):
+                return ParroLoginFlowError("token_exchange_failed")
+            if str(err).startswith("Kon het login formulier niet vinden"):
+                return ParroLoginFlowError("unsupported_login_form")
+        # The SDK's HTML substring check and generic failure cannot establish
+        # that credentials were rejected. Never surface their raw messages.
+        return ParroLoginFlowError("login_not_completed")
     return ParroError("Parro returned an unsupported response")
 
 
@@ -159,7 +190,7 @@ def _sdk_module() -> ModuleType:
         def send(self, request: httpx.Request, **kwargs: Any) -> httpx.Response:
             self._request_count += 1
             if self._request_count > 40:
-                raise ParroError("Too many Parro sign-in redirects")
+                raise ParroLoginFlowError("redirect_limit")
             if (
                 request.url.scheme != "https"
                 or request.url.host != "inloggen.parnassys.net"
@@ -167,9 +198,15 @@ def _sdk_module() -> ModuleType:
                 or request.url.username
                 or request.url.password
             ):
-                raise ParroError("Unexpected Parro sign-in destination")
+                raise ParroLoginFlowError("unexpected_destination")
             if request.url.path == "/idp/oauth2/authorize":
-                self._oauth_state = request.url.params.get("state")
+                states = request.url.params.get_list("state")
+                if self._oauth_state is None:
+                    if len(states) != 1 or not states[0]:
+                        raise ParroLoginFlowError("state_mismatch")
+                    self._oauth_state = states[0]
+                elif states and states != [self._oauth_state]:
+                    raise ParroLoginFlowError("state_mismatch")
             response = super().send(request, **kwargs)
             if response.is_error:
                 response.raise_for_status()
@@ -183,13 +220,13 @@ def _sdk_module() -> ModuleType:
     def choose_account(client: Any, page_url: str, html: str, account: str | None) -> str:
         choices = module._parse_account_chooser(html)
         if not choices:
-            raise ParroError("Parro returned an unsupported account chooser")
+            raise ParroLoginFlowError("unsupported_account_chooser")
         selectors: dict[str, dict[str, str]] = {}
         for choice in choices:
             fingerprint = f"{choice['name']}\0{choice['role']}"
             choice_id = hashlib.sha256(fingerprint.encode()).hexdigest()[:24]
             if choice_id in selectors or not choice["name"]:
-                raise ParroError("Parro returned ambiguous account choices")
+                raise ParroLoginFlowError("unsupported_account_chooser")
             selectors[choice_id] = choice
         if account is None:
             raise ParroAccountSelectionRequired(
@@ -204,7 +241,7 @@ def _sdk_module() -> ModuleType:
                 ]
             )
         if account not in selectors:
-            raise ParroError("The selected Parro identity is no longer available")
+            raise ParroLoginFlowError("unsupported_account_chooser")
         chosen = selectors[account]
         base = re.search(r'Wicket\.Ajax\.baseUrl="([^"]*)"', html)
         response = client.get(
@@ -222,7 +259,7 @@ def _sdk_module() -> ModuleType:
             redirect = re.search(r"<redirect><!\[CDATA\[(.*?)\]\]></redirect>", response.text)
             location = redirect.group(1) if redirect else ""
         if not location:
-            raise ParroError("Parro account selection did not return a redirect")
+            raise ParroLoginFlowError("unsupported_account_chooser")
         if location.startswith("parro://"):
             _check_state(location, client._oauth_state)
         return location
@@ -277,14 +314,15 @@ def _sdk_module() -> ModuleType:
 
 def _check_state(location: str, expected: str | None) -> None:
     parsed = urlparse(location)
-    values = parse_qs(parsed.query)
+    values = parse_qs(parsed.query, keep_blank_values=True)
     if (
-        parsed.netloc != "oauth2"
+        parsed.scheme != "parro"
+        or parsed.netloc != "oauth2"
         or parsed.path
         or not expected
         or values.get("state") != [expected]
     ):
-        raise ParroAuthError("Parro returned an invalid sign-in state")
+        raise ParroLoginFlowError("state_mismatch")
 
 
 async def async_login(
@@ -302,12 +340,16 @@ async def async_login(
     def login() -> LoginResult:
         try:
             module = _sdk_module()
-            tokens = _tokens(module.ParroAuth.login(username, password, account=account_id))
+            raw_tokens = module.ParroAuth.login(username, password, account=account_id)
+            try:
+                tokens = _tokens(raw_tokens)
+            except ParroAuthError:
+                raise ParroLoginFlowError("token_exchange_failed") from None
             with module.ParroClient(tokens["access_token"]) as client:
                 account = client.get_account()
             verified_id = _id(account)
             if not verified_id:
-                raise ParroError("Parro did not return an account ID")
+                raise ParroLoginFlowError("login_not_completed")
             return LoginResult(tokens, verified_id, "Parro")
         except Exception as err:
             raise _error(err, login=True) from None
@@ -383,7 +425,7 @@ class ParroApi:
         try:
             updated = _tokens(self._sdk.ParroAuth.refresh(refresh), self._tokens)
         except Exception as err:
-            raise _error(err, login=True) from None
+            raise _error(err, refresh=True) from None
         if self._client:
             self._client.__exit__(None, None, None)
             self._client = None
