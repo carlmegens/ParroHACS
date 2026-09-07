@@ -1,0 +1,15 @@
+# Zelfstandig voorbeeld. Kies het account in de visuele kaarteditor of vervang
+# alleen de onderstaande configuratie-ID door die van je eigen Parro-integratie.
+title: Parro
+views:
+  - title: School
+    path: school
+    icon: mdi:school-outline
+    cards:
+      - type: custom:parro-card
+        config_entry_id: VUL_PARRO_CONFIG_ENTRY_ID_IN
+        title: Schoolmededelingen
+        limit: 5
+        show_images: true
+        # Optioneel: alleen mededelingen uit een groep van dit account.
+        # group_id: VUL_GROEP_ID_IN

@@ -1,146 +1,148 @@
 # Parro voor Home Assistant
 
-Een eigen, onofficiële Home Assistant-integratie voor compacte schoolstatus en het op verzoek lezen van Parro-informatie. Aanmelden en accountkeuze gaan via de Home Assistant-interface. Een aparte app, MQTT-brug of browserextensie is niet nodig.
+Schoolmededelingen en foto's op je Home Assistant-dashboard, met accountkeuze, toegang per gebruiker en compacte statussensoren. Eén HACS-installatie levert de Parro-integratie en de bijbehorende dashboardkaart.
 
 [![Open Parro in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=carlmegens&repository=ParroHACS&category=integration)
 
-Opent deze repository in HACS. HACS moet al geïnstalleerd zijn in je Home Assistant.
-
-**Versie 0.1.2 verbetert de afhandeling van de terugkeer uit het aanmeldscherm.** De nieuwe aanmeldpoging met 0.1.1 mislukte nog met `state_mismatch`. Installatie via HACS is bevestigd; een geslaagde accountaanmelding nog niet. Versie 0.1.2 vereist opnieuw een live aanmeldproef.
-
-Versie 0.1.2 is lokaal gecontroleerd met **200 geslaagde tests** op Home Assistant Core 2026.8.3 en een gemockte Parro-server. Code- en formatteringscontroles slagen. De [wijzigingen](CHANGELOG.md) beschrijven de aanvullende correctie en haar bron; de [releasechecklist](RELEASE_CHECKLIST.md) houdt de controles bij. De eerder gevonden fout in 0.1.1 en de nieuwe correctie bewijzen niet welke aanmeldroute de praktijkproef precies volgde.
-
-## Vereisten
-
-- Home Assistant Core **2026.8.3 of nieuwer**; de lokale testbasis is precies 2026.8.3.
-- Een Parro-/ParnasSys-account met toegang tot de gewenste schoolinformatie.
-- Internettoegang vanuit Home Assistant naar `inloggen.parnassys.net` en `rest-v2.parro.com`. Home Assistant installeert de vastgezette afhankelijkheid `parro==1.1.0` bij het laden.
-- Voor installatie via HACS: een gepubliceerde, openbare GitHub-repository met deze integratie. Voor de lokale ZIP is HACS niet nodig.
+**Versie 0.2.0 voegt de kaart voor mededelingen en foto's toe.** Installatie via HACS, aanmelding en de samenvatting met tellers zijn met versie 0.1.2 door de gebruiker bevestigd. Versie 0.2.0 is lokaal gecontroleerd met **374 Python-tests en 14 browsercontroles**, op Home Assistant Core 2026.8.3 met een gemockte Parro-server en uitsluitend fictieve schoolgegevens. De kaart is visueel gecontroleerd op desktop en mobiel, in lichte en donkere weergave. Praktijkcontroles staan in de [releasechecklist](RELEASE_CHECKLIST.md).
 
 ## Installeren via HACS
 
-Met de knop hierboven open je Parro rechtstreeks in HACS. Handmatig toevoegen kan ook:
+Vereist: Home Assistant Core **2026.8.3 of nieuwer**, HACS en een Parro-/ParnasSys-account met de gewenste schoolinformatie. De knop hierboven opent deze repository in je eigen HACS-installatie.
 
-1. Open HACS, kies het menu met de drie puntjes en **Aangepaste repositories / Custom repositories**.
-2. Voeg **https://github.com/carlmegens/ParroHACS** toe, met type **Integratie / Integration**.
-3. Open **Parro** in HACS, download de integratie en herstart Home Assistant.
-4. Ga naar **Instellingen → Apparaten en diensten → Integratie toevoegen**, zoek **Parro** en meld je aan.
-5. Kies de juiste identiteit wanneer het account meerdere ParnasSys-identiteiten aanbiedt.
+1. Open **Parro** in HACS en download de integratie. Handmatig toevoegen kan via **Aangepaste repositories**, adres **https://github.com/carlmegens/ParroHACS**, type **Integratie**.
+2. Herstart Home Assistant.
+3. Ga naar **Instellingen → Apparaten en diensten → Integratie toevoegen**, zoek **Parro** en meld je aan.
+4. Kies de juiste identiteit wanneer het account meerdere ParnasSys-identiteiten aanbiedt.
+5. Open je dashboard en herlaad de pagina om de meegeleverde kaart te laden.
 
-Dit is een aangepaste HACS-repository; opname in de standaardcatalogus is niet aangevraagd. HACS gebruikt de bestanden van de standaardbranch `main`. Zie de [officiële uitleg voor aangepaste repositories](https://www.hacs.xyz/docs/faq/custom_repositories/). De indeling volgt de [integratievereisten van HACS](https://www.hacs.xyz/docs/publish/integration/).
+Dit is een aangepaste HACS-repository. HACS gebruikt de bestanden op `main`; opname in de standaardcatalogus is niet aangevraagd. Zie de [officiële HACS-instructies](https://www.hacs.xyz/docs/faq/custom_repositories/).
 
-## Handmatig installeren
+## De kaart toevoegen
 
-1. Open [de repository](https://github.com/carlmegens/ParroHACS) en kies **Code → Download ZIP**.
-2. Pak de ZIP uit en kopieer de map `custom_components/parro` naar de configuratiemap van Home Assistant. Het resultaat moet `<config>/custom_components/parro/manifest.json` zijn. Op Home Assistant OS is de configuratiemap doorgaans `/config`.
-3. Herstart Home Assistant en voeg **Parro** toe onder **Instellingen → Apparaten en diensten**.
+1. Kies op je dashboard **Dashboard bewerken → Kaart toevoegen** en zoek **Parro**.
+2. Kies in de visuele editor het gekoppelde Parro-account.
+3. Stel de titel, het aantal mededelingen en de fotoweergave in en sla de kaart op.
 
-Kopieer alleen de integratiemap naar Home Assistant. De tests en documentatie in de repository zijn bedoeld voor ontwikkeling. Een met de lokale distributiehelper gebouwde installatie-ZIP bevat dezelfde integratiemap en openbare documentatie, plus een aparte SHA-256-inventaris.
+De kaart toont standaard vijf mededelingen met beschikbare foto's. Je kunt 1–20 mededelingen kiezen en desgewenst op één groep filteren. De lijst is begrensd en is geen volledig schoolarchief. De kaart toont mededelingen; gesprekken blijven beschikbaar via de bestaande leesacties verderop.
 
-Bij handmatig bijwerken: bewaar de bestaande integratiemap als reservekopie buiten `custom_components`, vervang de volledige map `parro` door de nieuwe versie en herstart Home Assistant. De accountinstellingen staan afzonderlijk in Home Assistant. Verwijderen gaat via **Apparaten en diensten**; verwijder daarna desgewenst de map en herstart.
+Voor handmatig toevoegen kun je beginnen met onderstaande configuratie en daarna het account in de visuele editor kiezen:
 
-## Aanmelding en instellingen
+```yaml
+type: custom:parro-card
+```
 
-Voer het wachtwoord alleen in de Home Assistant-configuratieflow in. Het blijft tijdelijk in het geheugen tijdens het aanmelden en wordt niet als instelling opgeslagen. Toegangs- en ververstokens worden in de Home Assistant-config entry bewaard; er wordt geen tokenbestand van de Parro-CLI aangemaakt. Behandel Home Assistant-back-ups daarom als privégegevens.
+Het account is vereist voordat de kaart inhoud kan ophalen. Voor een los dashboard staat een generiek [voorbeeld met toelichting](examples/README.md) klaar. Het voorbeeld gebruikt uitsluitend invulvelden voor de eigen configuratie.
 
-De gekozen identiteit wordt na aanmelding gekoppeld aan de echte account-ID van de Parro-API. Hetzelfde account kan niet dubbel worden toegevoegd. Bij verlopen of ingetrokken toegang vraagt Home Assistant om opnieuw aan te melden; daarbij moet hetzelfde account worden gekozen.
+## Andere gebruikers toegang geven
 
-De integratie ververst tokens automatisch en probeert een lezing na een 401 eenmaal opnieuw na tokenverversing. Een wijziging van tokens veroorzaakt geen herlaadlus.
+Home Assistant-beheerders hebben standaard toegang tot de kaartinhoud. Om een andere gebruiker mee te laten lezen, open je **Instellingen → Apparaten en diensten → Parro → Configureren** en selecteer je die gebruiker bij **Toegang tot mededelingen en foto’s**.
 
-De oorspronkelijke OAuth-`state` blijft behouden wanneer de aanmeldserver een tussenstap zonder nieuwe waarde hervat. Versie 0.1.2 accepteert daarnaast de callbackvorm met poort 443 en een afsluitende slash die in de tests van de vastgezette Parro-SDK voorkomt. De teruggegeven `state` moet nog steeds exact overeenkomen; een later aangeboden afwijkende waarde wordt afgewezen. Technische fouten tijdens de aanmeldflow krijgen een andere melding dan geweigerde aanmeldgegevens.
+Toegang geldt per gekoppeld Parro-account. De kaart biedt alleen accounts aan die de ingelogde Home Assistant-gebruiker mag lezen. Het delen van een dashboard of het invullen van een account-ID verleent op zichzelf geen toegang. Een beheerder kan de geselecteerde gebruikers later weer verwijderen. De bestaande vier leesacties blijven voor beheerders en automatiseringen beschikbaar; de nieuwe instelling geeft daarop geen extra rechten.
 
-Via **Configureren** bij de integratie kun je het ophaalinterval wijzigen. Standaard is dit **30 minuten**; toegestaan is **15 tot en met 240 minuten**. Dit interval staat los van eventuele verversing van een dashboard of scherm.
+## Kaartresource controleren
 
-## Sensoren
+Bij dashboardresources die Home Assistant via de interface beheert, registreert of actualiseert de integratie haar eigen kaartresource automatisch. Als **Parro** niet verschijnt of je **Custom element doesn't exist: parro-card** ziet, herlaad dan eerst de browserpagina.
+
+Controleer zo nodig onder **Instellingen → Dashboards → menu → Resources / Bronnen** of deze resource eenmaal aanwezig is:
+
+- URL: `/parro_static/parro-card.js?v=0.2.0`
+- Type: **JavaScript-module**
+
+Beheer je dashboardresources in YAML, voeg dan dit item toe aan de bestaande lijst met resources:
+
+```yaml
+- url: /parro_static/parro-card.js?v=0.2.0
+  type: module
+```
+
+Zie de [officiële uitleg over resources](https://developers.home-assistant.io/docs/frontend/custom-ui/registering-resources/). De kaartcode staat in `custom_components/parro/frontend/parro-card.js` en wordt door de integratie aangeboden; je hoeft geen bestand naar `www` te kopiëren.
+
+## Aanmelding, verversing en foto's
+
+Voer het wachtwoord alleen in de Home Assistant-aanmeldflow in. Het blijft tijdelijk in het geheugen tijdens het aanmelden en wordt niet als instelling opgeslagen. Toegangs- en ververstokens worden in de Home Assistant-config entry bewaard; de Parro-CLI schrijft hiervoor geen tokenbestand. Behandel Home Assistant-back-ups als privégegevens.
+
+De gekozen identiteit wordt aan de echte Parro-account-ID gekoppeld. Hetzelfde account kan niet dubbel worden toegevoegd. De integratie ververst tokens automatisch en herstelt een API-lezing na een 401 eenmaal met tokenverversing. Bij ingetrokken toegang vraagt Home Assistant om opnieuw aan te melden met hetzelfde account.
+
+Via **Parro → Configureren** stel je het interval voor de statussensoren in: standaard **30 minuten**, toegestaan **15–240 minuten**. De kaart haalt haar mededelingen op aanvraag op en ververst elke **vijf minuten** zolang zij zichtbaar is. De server hergebruikt de opgehaalde lijst vijf minuten, zodat meerdere kaarten niet voortdurend dezelfde schoolinformatie opvragen. Bij een verbindingsfout kan de laatst opgehaalde lijst nog maximaal één uur worden getoond, met een melding dat de gegevens mogelijk verouderd zijn.
+
+Foto's worden via een beveiligde Home Assistant-route aangeboden en tijdelijk in een begrensde privé-cache bewaard. De kaart krijgt geen originele school- of bijlage-URL's. Per mededeling worden maximaal drie foto's voorbereid; de kaart toont maximaal twaalf foto's tegelijk. Afbeeldingen worden als JPEG met maximaal 1600 pixels aan de langste zijde aangeboden. Dit is geen algemene bijlagedownloader.
+
+Home Assistant heeft internettoegang nodig naar `inloggen.parnassys.net`, `rest-v2.parro.com` en de door Parro gebruikte, gecontroleerde afbeeldingsbestemmingen. De vastgezette afhankelijkheid is `parro==1.1.0`.
+
+## Statussensoren
 
 | Sensor | Betekenis |
 | --- | --- |
-| Verbinding | De laatste periodieke synchronisatie is geslaagd en er is sindsdien geen API-lezing mislukt. Na een fout herstelt deze status bij een geslaagde periodieke synchronisatie. |
+| Verbinding | Verbindingsstatus van de statussynchronisatie. Een mislukte leesactie kan deze ook uitschakelen; een geslaagde statussynchronisatie herstelt de status. De kaart meldt haar eigen laadproblemen. |
 | Laatste geslaagde synchronisatie | Tijdstip van de laatste geslaagde synchronisatie; blijft bij een storing op dat tijdstip staan. |
 | Kinderen | Aantal gekoppelde kinderen, voor zover de API dit levert. |
 | Groepen | Aantal gekoppelde groepen, voor zover de API dit levert. |
 | Ongelezen mededelingen | Het door Parro geleverde aantal ongelezen mededelingen. |
-| Ongelezen gesprekken | Het door Parro geleverde aantal chatrooms met ongelezen inhoud, dus geen aantal afzonderlijke chatberichten. |
+| Ongelezen gesprekken | Aantal chatrooms met ongelezen inhoud; geen aantal afzonderlijke chatberichten. |
 
-Ontbrekende aantallen zijn onbekend, nooit automatisch nul. Voor kinderen en groepen wordt begrensd opgehaald; bij een volle lijst van 100 resultaten is het totaal onbekend. Bij een mislukte synchronisatie zijn tellers niet beschikbaar en staat de verbindingssensor uit. Sensorstates, attributen en diagnostiek bevatten geen berichtteksten, namen van kinderen, bijlageadressen of iCal-URL's.
+Ontbrekende aantallen zijn onbekend, nooit automatisch nul. Bij een volle begrensde lijst van 100 kinderen of groepen is het totaal onbekend. Bij een mislukte synchronisatie zijn tellers niet beschikbaar. Sensorstates, attributen en diagnostiek bevatten geen berichtteksten, kindnamen, foto's, bijlageadressen of iCal-URL's.
 
-## Leesacties op aanvraag
+## Leesacties voor automatiseringen
 
-De acties hieronder leveren een antwoord terug. Ze zijn bruikbaar via **Ontwikkelaarstools → Acties** of in een automatisering met `response_variable`. Een handmatige actie vereist een Home Assistant-beheerder. Automatiseringen zonder gebruikerscontext kunnen de acties uitvoeren.
+De vier bestaande acties leveren een antwoord terug via **Ontwikkelaarstools → Acties** of `response_variable` in een automatisering. Een handmatige actie vereist een Home Assistant-beheerder; automatiseringen zonder gebruikerscontext kunnen deze ook uitvoeren.
 
-Alle acties vereisen **`config_entry_id`** van het gewenste Parro-account. De actie-interface biedt hiervoor een integratiekiezer. In YAML kun je de ID vinden met een bekende Parro-entiteit: `{{ config_entry_id('sensor.jouw_parro_entiteit') }}` onder **Ontwikkelaarstools → Sjablonen**. Entiteitsnamen kunnen per installatie verschillen.
+Alle acties vereisen `config_entry_id` van het gekozen Parro-account. De actie-interface biedt hiervoor een integratiekiezer. `limit` is optioneel: standaard **20**, minimaal **1**, maximaal **50**. Het antwoord bevat `items`, `returned` en `limit`; een selectie is geen volledig archief.
 
-`limit` is optioneel: standaard **20**, minimaal **1**, maximaal **50**. Het antwoord bevat `items`, `returned` en `limit`. Een begrensd resultaat is geen volledig archief; er wordt niet onbeperkt door pagina's gelopen. Ook lange teksten en lijsten met bijlagemetadata worden afgekapt om de respons compact te houden.
-
-| Actie | Extra invoer | Inhoud van `items` |
+| Actie | Extra invoer | Antwoorditems |
 | --- | --- | --- |
 | `parro.get_announcements` | — | Mededelingen met geselecteerde velden en bijlagemetadata. |
-| `parro.get_chatrooms` | — | Gesprekken met de benodigde identificatie voor een vervolgopvraag. |
-| `parro.get_messages` | `chatroom_id` | Berichten uit één gekozen gesprek. |
-| `parro.get_calendar_urls` | — | Door Parro geleverde iCal-URL's. |
+| `parro.get_chatrooms` | — | Gesprekken met identificatie voor een vervolgopvraag. |
+| `parro.get_messages` | `chatroom_id` | Berichten uit één gesprek. |
+| `parro.get_calendar_urls` | — | iCal-URL's; de integratie leest hiermee geen afspraken uit. |
 
-De antwoordvelden zijn bewust beperkt; niet door de API geleverde waarden zijn `null`:
-
-- Mededelingen: `id`, `title`, `contents`, `created_at`, `sort_date`, `read`, `sender`, `group_id`, `attachments`.
-- Gesprekken: `id`, `title`, `type`, `sort_date`, `unread_count`.
-- Berichten: `id`, `text`, `created_at`, `last_modified_at`, `read`, `sender`, `attachments`. Aanmaak- en wijzigingstijd blijven afzonderlijk; een wijzigingstijd wordt niet als aanmaaktijd ingevuld.
-- Kalenderadressen: een lijst URL-strings. De integratie opent deze adressen niet en leest hiermee geen agenda-afspraken uit.
-
-Bijlagemetadata bevat `id`, `name`, `type`, `size` en een beperkte lijst `entries` met `type`, `size`, `mime_type`. Berichtinhoud blijft de door Parro geleverde tekst; deze integratie interpreteert geen schoolafspraken of HTML.
-
-`chatroom_id` komt uit `get_chatrooms` en is een positief numeriek ID van maximaal 20 cijfers. Dit voorbeeld is een actiestap in een automatisering; vul de eigen config-entry-ID in:
+`chatroom_id` is een positief numeriek ID van maximaal 20 cijfers, afkomstig uit `get_chatrooms`. Voorbeeld van een actiestap:
 
 ```yaml
 action: parro.get_announcements
 data:
-  config_entry_id: "VUL_CONFIG_ENTRY_ID_IN"
+  config_entry_id: VUL_PARRO_CONFIG_ENTRY_ID_IN
   limit: 10
 response_variable: schoolmededelingen
 ```
 
-Lees daarna bijvoorbeeld `schoolmededelingen['items']` uit in volgende stappen. De inhoud van antwoorden is privé en kan zichtbaar worden in automatiseringstraces of in bestemmingen die je zelf kiest. De integratie slaat deze antwoorden niet als sensorattributen op. iCal-URL's kunnen toegang tot een agenda geven: deel ze alleen met de bedoelde bestemming.
+Lees daarna `schoolmededelingen['items']` uit. Deze antwoorden kunnen privé-inhoud en kalenderadressen bevatten en zichtbaar worden in automatiseringstraces of in de bestemming die je zelf kiest. De acties leveren voor bijlagen uitsluitend metadata; foto-inhoud voor de kaart loopt via de afzonderlijke beveiligde route.
 
-Periodieke synchronisatie leest geen chatinhoud. Deze versie biedt geen verzenden, markeren als gelezen, bijlagen downloaden, absenties, inschrijven of AI-aansluiting. Bijlagen worden alleen als metadata teruggegeven, zonder download-URL. Eventuele effecten van leesaanroepen op de leesstatus aan de serverkant moeten nog met een echt account worden gecontroleerd. Volledige kalenderdetails en de volledigheid van de historie zijn niet aangetoond.
+Voor eigen toepassingen is ook een aangemelde HTTP-lezing beschikbaar: `GET /api/parro/{config_entry_id}/feed?limit=5`, optioneel met `group_id`. Deze gebruikt dezelfde toegangscontrole als de kaart en accepteert 1–20 mededelingen. Gebruik de gebruikelijke Home Assistant-authenticatie; zet geen toegangstoken in de URL of in dashboard-YAML. De kaart gebruikt de overeenkomstige Home Assistant-WebSocketverbinding.
+
+Periodieke statussynchronisatie leest geen chatinhoud. Deze versie biedt geen verzenden, markeren als gelezen, absenties, inschrijven, volledige archiefexport of AI-aansluiting. Eventuele effecten van leesaanroepen op de leesstatus aan de serverkant zijn nog niet volledig live beproefd.
 
 ## Problemen oplossen
 
-- **Parro verschijnt niet bij integraties:** controleer de mapstructuur en herstart Home Assistant. Controleer dat Core aan de minimumversie voldoet en de afhankelijkheid kon worden geïnstalleerd.
+- **Geen kaart in de kaartkiezer:** herlaad de browser en controleer de kaartresource zoals hierboven beschreven.
+- **Geen account om te kiezen of geen toegang:** controleer of Parro is aangemeld en of de ingelogde Home Assistant-gebruiker beheerder is of toegang heeft gekregen bij de Parro-opties.
+- **Een foto ontbreekt:** niet elke bijlage is een ondersteunde foto. De kaart begrenst het aantal foto's; een geweigerde of niet beschikbare afbeelding maakt de mededeling niet onleesbaar.
 - **Aanmeldgegevens geweigerd:** controleer het account via Parro zelf. Deze integratie gebruikt een gebruikersnaam/wachtwoordflow; andere aanmeldvarianten zijn niet live gevalideerd.
-- **Technische fout tijdens aanmelden:** werk via HACS bij naar 0.1.2 of nieuwer, herstart Home Assistant en begin een nieuwe aanmelding via **Integratie toevoegen → Parro**. Deze fout betekent niet automatisch dat het wachtwoord onjuist is. De integratie logt hiervoor uitsluitend een vaste technische foutcategorie, zonder aanmeldgegevens of de inhoud van serverantwoorden.
+- **Technische aanmeldfout:** werk bij naar de nieuwste versie, herstart Home Assistant en begin een nieuwe aanmelding. De fout betekent niet automatisch dat het wachtwoord onjuist is. De integratie logt alleen een vaste technische foutcategorie.
 - **Verbinding uit of tellers niet beschikbaar:** wacht op de volgende synchronisatie of herlaad de integratie eenmaal. Bij een authenticatieprobleem biedt Home Assistant heraanmelding aan.
-- **Verkeerde identiteit bij heraanmelding:** kies dezelfde Parro-identiteit. Voeg een ander account toe als aparte integratie.
-- **Een leesactie faalt:** kies een geladen Parro-config entry en controleer de grenzen van `limit` en `chatroom_id`.
 
-Diagnostiek bevat uitsluitend de instellingsstatus, het ophaalinterval, de uitkomst van de laatste synchronisatie en het tijdstip van de laatste geslaagde synchronisatie. Deel geen wachtwoorden, tokens, kalender-URL's of schoolberichten in een probleemmelding. De integratie is onafhankelijk ontwikkeld en wordt niet door Parro, ParnasSys of Home Assistant ondersteund.
+Diagnostiek bevat beperkte technische status. Deel geen wachtwoorden, tokens, kalender-URL's, schoolberichten of foto's in een probleemmelding.
 
-## Lokaal controleren en een pakket maken
+## Handmatige installatie en ontwikkeling
 
-Voer onderstaande opdrachten uit vanuit de root van deze integratie. Voor de testomgeving is Python **3.14.2 of nieuwer binnen 3.14** nodig; de distributiehelper gebruikt alleen de standaardbibliotheek.
+Download de repository via **Code → Download ZIP**. Kopieer de volledige map `custom_components/parro` naar de Home Assistant-configuratiemap, zodat `<config>/custom_components/parro/manifest.json` bestaat. Herstart Home Assistant en volg daarna de stappen voor aanmelden en het toevoegen van de kaart. Bij handmatig bijwerken vervang je de volledige integratiemap; bewaar een eventuele reservekopie buiten `custom_components`.
+
+Voor de testomgeving is Python **3.14.2 of nieuwer binnen 3.14** nodig. Voer vanuit deze repository uit:
 
 ```sh
 python3.14 -m venv .venv
 .venv/bin/python -m pip install -r requirements-test.txt
 .venv/bin/python -m pytest -q
-.venv/bin/python scripts/prepare_repository.py --local-archive dist/parro-0.1.2-local.zip
+.venv/bin/python scripts/prepare_repository.py --check
+.venv/bin/python scripts/prepare_repository.py --local-archive dist/parro-0.2.0-local.zip
 ```
 
-De helper weigert bestaande uitvoer te overschrijven. Kies bij opnieuw bouwen een nieuwe ZIP-naam of verwijder bewust alleen een eerdere, zelf gemaakte ZIP en bijbehorende inventaris. De testbestanden en testafhankelijkheden staan in de repository; het installatiepakket bevat uitsluitend de integratie en expliciet toegestane documentatie. De meegeleverde SDK wordt bij installatie opgehaald en is niet in het pakket gekopieerd.
+De meegeleverde kaart heeft ook [synthetische browsertests en een lokale voorvertoning](tests/frontend/README.md). Deze gebruiken de echte kaartcode met verzonnen accounts, berichten en lokaal getekende foto's. De installatiekaart zelf heeft geen Node-afhankelijkheden.
 
-De metadata voor deze repository controleer je met `python3 scripts/prepare_repository.py --check`. Voor een nieuwe versie of een fork kan de helper daarnaast een **nieuwe lokale stagingmap** met expliciet opgegeven GitHub-gegevens maken:
+De installatie-ZIP bevat de integratie inclusief kaart, openbare documentatie en het generieke voorbeelddashboard. Een aparte SHA-256-inventaris vermeldt de inhoud. De helper weigert bestaande uitvoer te overschrijven en kopieert alleen expliciet toegestane bestanden. Overdrachtsnotities, lokale verslagen, tests, ontwikkelhulpbestanden, afhankelijkheidsmappen, screenshots en familie- of dashboardgegevens worden niet meegenomen. Synthetische tests blijven wel in de bronrepository beschikbaar voor onderhoud.
 
-```sh
-python3 scripts/prepare_repository.py \
-  --output dist/repository-ready \
-  --owner carlmegens \
-  --repo ParroHACS \
-  --codeowner carlmegens
-python3 dist/repository-ready/scripts/prepare_repository.py --check
-```
+Voor een nieuwe lokale publicatiemap kun je `scripts/prepare_repository.py` gebruiken met `--output`, `--owner`, `--repo` en `--codeowner`. De helper controleert de lokale structuur en publicatiemetadata, waaronder niet ingevulde waarden. Hij installeert of publiceert niets en neemt geen contact op met GitHub of Parro.
 
-`--codeowner` accepteert een GitHub-gebruiker of `organisatie/team`, met of zonder `@`, en kan worden herhaald. `--check` weigert ontbrekende publicatiemetadata en placeholders. Een geslaagde stagingcontrole bewijst de lokale structuur; eigendom, bereikbaarheid en HACS-installatie zijn daarmee nog niet online gecontroleerd. De helper publiceert niets, installeert niets en neemt geen contact op met GitHub of Parro.
+## Licentie
 
-De distributielijst voor ZIP en minimale staging sluit overdrachtsnotities, tests, caches en dashboard- of familiebestanden uit en weigert symlinks en onverwachte bestanden in de integratiemap. Deze bronrepository bevat daarnaast de gecontroleerde synthetische tests en hun testconfiguratie; die zijn niet nodig voor HACS-installatie. Controleer daarnaast de werkelijke inhoud voor publicatie. Gebruik de [releasechecklist](RELEASE_CHECKLIST.md) voor de resterende account-, host- en publicatieproeven.
-
-## Licentie en afhankelijkheid
-
-De eigen integratiecode valt onder de [MIT-licentie](LICENSE). De apart geïnstalleerde afhankelijkheid [`parro` 1.1.0](https://github.com/anneschuth/parro-cli/releases/tag/v1.1.0) is van de auteurs van `parro-cli` en behoudt haar eigen licentie en auteursrecht. Dit project maakt geen aanspraak op die broncode of op de merken Parro en ParnasSys.
+De eigen integratie en kaart vallen onder de [MIT-licentie](LICENSE). De apart geïnstalleerde afhankelijkheid [`parro` 1.1.0](https://github.com/anneschuth/parro-cli/releases/tag/v1.1.0) behoudt haar eigen licentie en auteursrecht. Dit project is onofficieel en wordt niet door Parro, ParnasSys of Home Assistant ondersteund.

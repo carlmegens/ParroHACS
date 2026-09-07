@@ -178,3 +178,49 @@ async def test_poll_options_reject_outside_bounds(hass, config_entry, interval):
     result = await hass.config_entries.options.async_init(config_entry.entry_id)
     with pytest.raises(vol.Invalid):
         result["data_schema"]({"poll_interval": interval})
+
+
+async def test_options_select_and_remove_dashboard_viewers(hass, config_entry, hass_read_only_user):
+    config_entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(config_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"poll_interval": 30, "dashboard_viewers": [hass_read_only_user.id]}
+    )
+    assert result["type"] is data_entry_flow.FlowResultType.CREATE_ENTRY
+    assert config_entry.options["dashboard_viewers"] == [hass_read_only_user.id]
+    result = await hass.config_entries.options.async_init(config_entry.entry_id)
+    assert result["data_schema"]({"poll_interval": 15})["dashboard_viewers"] == [
+        hass_read_only_user.id
+    ]
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"poll_interval": 15, "dashboard_viewers": []}
+    )
+    assert config_entry.options["dashboard_viewers"] == []
+
+
+async def test_options_rechecks_users_on_submit(hass, config_entry, hass_read_only_user):
+    config_entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(config_entry.entry_id)
+    await hass.auth.async_update_user(hass_read_only_user, is_active=False)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"poll_interval": 30, "dashboard_viewers": [hass_read_only_user.id]}
+    )
+    assert result["type"] is data_entry_flow.FlowResultType.FORM
+    assert result["errors"] == {"dashboard_viewers": "invalid_viewers"}
+    assert not config_entry.options
+
+
+async def test_options_only_lists_eligible_users(
+    hass, config_entry, hass_admin_user, hass_read_only_user, hass_supervisor_user
+):
+    import voluptuous as vol
+    from pytest_homeassistant_custom_component.common import MockUser
+
+    disabled = MockUser(is_active=False).add_to_hass(hass)
+    config_entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(config_entry.entry_id)
+    schema = result["data_schema"]
+    assert schema({"poll_interval": 30, "dashboard_viewers": [hass_read_only_user.id]})
+    for user_id in [hass_admin_user.id, hass_supervisor_user.id, disabled.id, "unknown"]:
+        with pytest.raises(vol.Invalid):
+            schema({"poll_interval": 30, "dashboard_viewers": [user_id]})

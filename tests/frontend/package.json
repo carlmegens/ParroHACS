@@ -1,0 +1,12 @@
+{
+  "name": "parro-card-synthetic-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "preview": "node serve.mjs",
+    "test": "node test-card.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

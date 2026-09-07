@@ -20,6 +20,7 @@ from .api import (
 )
 from .const import (
     CONF_ACCOUNT_ID,
+    CONF_DASHBOARD_VIEWERS,
     CONF_POLL_INTERVAL,
     CONF_TOKENS,
     DEFAULT_POLL_INTERVAL,
@@ -135,11 +136,25 @@ class ParroConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class ParroOptionsFlow(config_entries.OptionsFlow):
-    """Change the server polling interval independently of the display."""
+    """Configure polling and explicit read access to the account dashboard."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        users = [
+            user
+            for user in await self.hass.auth.async_get_users()
+            if user.is_active and not user.is_admin and not user.system_generated
+        ]
+        user_ids = {user.id for user in users}
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            viewers = user_input.get(CONF_DASHBOARD_VIEWERS, [])
+            if not isinstance(viewers, list) or any(viewer not in user_ids for viewer in viewers):
+                errors[CONF_DASHBOARD_VIEWERS] = "invalid_viewers"
+            else:
+                return self.async_create_entry(
+                    title="",
+                    data={**user_input, CONF_DASHBOARD_VIEWERS: list(dict.fromkeys(viewers))},
+                )
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
@@ -151,7 +166,24 @@ class ParroOptionsFlow(config_entries.OptionsFlow):
                         ),
                     ): vol.All(
                         vol.Coerce(int), vol.Range(min=MIN_POLL_INTERVAL, max=MAX_POLL_INTERVAL)
-                    )
+                    ),
+                    vol.Optional(
+                        CONF_DASHBOARD_VIEWERS,
+                        default=[
+                            viewer
+                            for viewer in self.config_entry.options.get(CONF_DASHBOARD_VIEWERS, [])
+                            if viewer in user_ids
+                        ],
+                    ): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=[
+                                {"value": user.id, "label": user.name or user.id} for user in users
+                            ],
+                            multiple=True,
+                            mode=selector.SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
                 }
             ),
+            errors=errors,
         )

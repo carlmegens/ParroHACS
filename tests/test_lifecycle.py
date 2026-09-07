@@ -40,6 +40,7 @@ async def test_setup_persist_tokens_apply_options_and_unload(hass, config_entry,
     await hass.async_block_till_done()
     mock_api.async_close.assert_awaited_once()
     assert coordinator._shutdown_requested
+    assert coordinator.feed._closed
     assert all(s.state == "unavailable" for s in hass.states.async_all())
     assert hass.services.has_service("parro", "get_announcements")
 
@@ -90,3 +91,4 @@ async def test_homeassistant_stop_closes_owned_http_client(hass, config_entry, m
     await hass.async_stop()
     mock_api.async_close.assert_awaited_once()
     assert config_entry.runtime_data._shutdown_requested
+    assert config_entry.runtime_data.feed._closed

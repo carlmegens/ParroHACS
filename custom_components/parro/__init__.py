@@ -11,6 +11,8 @@ from homeassistant.helpers.typing import ConfigType
 from .api import ParroApi
 from .const import CONF_ACCOUNT_ID, CONF_POLL_INTERVAL, CONF_TOKENS, DEFAULT_POLL_INTERVAL
 from .coordinator import ParroCoordinator
+from .dashboard import async_register_dashboard
+from .frontend import async_setup_frontend
 from .services import async_register_services
 
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]
@@ -19,6 +21,8 @@ type ParroConfigEntry = ConfigEntry[ParroCoordinator]
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async_register_services(hass)
+    async_register_dashboard(hass)
+    await async_setup_frontend(hass)
     return True
 
 

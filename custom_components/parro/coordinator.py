@@ -12,12 +12,13 @@ from homeassistant.util import dt as dt_util
 
 from .api import ParroApi, ParroAuthError, ParroConnectionError, ParroError
 from .const import CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL, DOMAIN
+from .feed import ParroFeed
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class ParroCoordinator(DataUpdateCoordinator[dict[str, Any]]):
-    """One poll for all sensors; content is fetched only by response actions."""
+    """One poll for counters, with an independent in-memory dashboard feed."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, api: ParroApi) -> None:
         super().__init__(
@@ -30,7 +31,12 @@ class ParroCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             ),
         )
         self.api = api
+        self.feed = ParroFeed(hass, api)
         self.last_success = None
+
+    async def async_shutdown(self) -> None:
+        await super().async_shutdown()
+        await self.feed.async_close()
 
     async def _async_update_data(self) -> dict[str, Any]:
         try:

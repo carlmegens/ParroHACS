@@ -30,7 +30,7 @@ def package_source(tmp_path: Path) -> Path:
             {
                 "domain": "parro",
                 "name": "Parro",
-                "version": "0.1.0",
+                "version": "0.2.0",
                 "config_flow": True,
                 "requirements": ["parro==1.1.0"],
                 "codeowners": [],
@@ -71,6 +71,10 @@ def stage_args(root: Path, output: Path) -> list[str]:
 def test_local_archive_excludes_unrelated_data_and_matches_inventory(package_source, tmp_path):
     (package_source / "HANDOFF.md").write_text("synthetic internal note")
     (package_source / "family.json").write_text('{"synthetic": true}')
+    for name in ("frontend-dev/harness.html", "node_modules/dependency.js", "screenshots/card.png"):
+        path = package_source / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"synthetic development-only fixture")
     (package_source / "tests").mkdir()
     (package_source / "tests/account.json").write_text('{"synthetic": true}')
     cache = package_source / "custom_components/parro/__pycache__"
@@ -124,7 +128,18 @@ def test_staging_updates_metadata_without_changing_source(package_source, tmp_pa
 
 
 @pytest.mark.parametrize(
-    "unexpected", ["tokens.json", "photo.jpg", "account.yaml", "nested/client.py"]
+    "unexpected",
+    [
+        "tokens.json",
+        "photo.jpg",
+        "account.yaml",
+        "nested/client.py",
+        "frontend/other.js",
+        "frontend/parro-card.js.map",
+        "frontend/package.json",
+        "frontend/node_modules/index.js",
+        "frontend/harness.html",
+    ],
 )
 def test_unexpected_component_files_are_rejected(package_source, tmp_path, unexpected):
     extra = package_source / "custom_components/parro" / unexpected
@@ -137,7 +152,13 @@ def test_unexpected_component_files_are_rejected(package_source, tmp_path, unexp
 
 @pytest.mark.parametrize(
     "relative",
-    ["README.md", "custom_components/parro/brand/icon.png", "custom_components/parro/linked"],
+    [
+        "README.md",
+        "custom_components/parro/brand/icon.png",
+        "custom_components/parro/linked",
+        "custom_components/parro/frontend/parro-card.js",
+        "examples/dashboard.yaml",
+    ],
 )
 def test_symlink_payload_is_rejected(package_source, tmp_path, relative):
     target = tmp_path / "outside"
@@ -158,8 +179,9 @@ def test_second_integration_is_rejected(package_source, tmp_path):
     assert prepare.main(stage_args(package_source, tmp_path / "output")) == 1
 
 
-def test_missing_runtime_file_is_rejected(package_source, tmp_path):
-    (package_source / "custom_components/parro/api.py").unlink()
+@pytest.mark.parametrize("filename", ["api.py", "dashboard.py", "feed.py", "frontend.py"])
+def test_missing_runtime_file_is_rejected(package_source, tmp_path, filename):
+    (package_source / "custom_components/parro" / filename).unlink()
     assert (
         prepare.main(
             ["--source", str(package_source), "--local-archive", str(tmp_path / "out.zip")]
@@ -271,6 +293,69 @@ def test_local_archive_does_not_accept_publication_options(package_source, tmp_p
 def test_malformed_metadata_fails_cleanly(package_source, tmp_path, relative, content):
     (package_source / relative).write_text(content)
     assert prepare.main(stage_args(package_source, tmp_path / "staging")) == 1
+    assert (
+        prepare.main(
+            ["--source", str(package_source), "--local-archive", str(tmp_path / "out.zip")]
+        )
+        == 1
+    )
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "custom_components/parro/frontend/parro-card.js",
+        "examples/dashboard.yaml",
+        "examples/README.md",
+    ],
+)
+def test_card_and_public_examples_are_required(package_source, tmp_path, relative):
+    (package_source / relative).unlink()
+    assert (
+        prepare.main(
+            ["--source", str(package_source), "--local-archive", str(tmp_path / "out.zip")]
+        )
+        == 1
+    )
+
+
+def test_frontend_and_examples_survive_archive_and_staging(package_source, tmp_path):
+    assets = {
+        "custom_components/parro/frontend/parro-card.js": b"// synthetic card runtime\n",
+        "examples/dashboard.yaml": b"title: Parro\nviews: []\n",
+        "examples/README.md": b"Synthetic public example guide\n",
+    }
+    for name, content in assets.items():
+        (package_source / name).write_bytes(content)
+    output = tmp_path / "out.zip"
+    assert prepare.main(["--source", str(package_source), "--local-archive", str(output)]) == 0
+    with ZipFile(output) as archive:
+        for name, content in assets.items():
+            assert archive.read(name) == content
+    staging = tmp_path / "staging"
+    assert prepare.main(stage_args(package_source, staging)) == 0
+    for name, content in assets.items():
+        assert (staging / name).read_bytes() == content
+
+
+@pytest.mark.parametrize(
+    "relative", ["examples/family.yaml", "examples/screenshot.png", "examples/harness.html"]
+)
+def test_unlisted_example_files_are_rejected(package_source, tmp_path, relative):
+    (package_source / relative).write_bytes(b"synthetic unlisted example")
+    assert (
+        prepare.main(
+            ["--source", str(package_source), "--local-archive", str(tmp_path / "out.zip")]
+        )
+        == 1
+    )
+
+
+def test_symlink_example_directory_is_rejected(package_source, tmp_path):
+    original = package_source / "examples"
+    renamed = package_source / "moved-examples"
+    original.rename(renamed)
+    original.symlink_to(renamed, target_is_directory=True)
     assert (
         prepare.main(
             ["--source", str(package_source), "--local-archive", str(tmp_path / "out.zip")]

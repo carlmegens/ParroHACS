@@ -1,5 +1,15 @@
 # Wijzigingen
 
+## 0.2.0 — mededelingen en foto's op het dashboard
+
+- Bundelt `custom:parro-card` met de bestaande HACS-integratie, inclusief visuele accountkeuze, titel, begrensd aantal mededelingen, optionele groepsfilter en fotoweergave.
+- Voegt toegang per Home Assistant-gebruiker toe voor mededelingen en foto's. Beheerders hebben standaard toegang; andere gebruikers worden per Parro-account geselecteerd.
+- Levert de kaartinhoud via aangemelde Home Assistant-routes en hergebruikt de feed vijf minuten. Bij een verbindingsfout kan een maximaal één uur oude lijst met een melding worden getoond. Foto's gebruiken een begrensde privé-cache; originele school- en bijlage-URL's worden niet aan de kaart doorgegeven.
+- Registreert de kaartresource bij dashboards die hun resources via de interface beheren, met een handmatige route voor YAML-resources.
+- Voegt een generiek voorbeelddashboard toe. De distributiehelper neemt uitsluitend het vastgelegde kaartbestand en de expliciete voorbeelden mee.
+
+Aanmelding en samenvatting met tellers zijn met 0.1.2 live bevestigd. De nieuwe kaart, fotoweergave en gebruikersrechten vereisen eigen verificatie; de releasechecklist houdt deze bij. De bestaande vier beheerdersacties blijven beschikbaar, waaronder de leesacties voor gesprekken.
+
 ## 0.1.2 — aanvullende correctie aanmelding
 
 - Accepteert de callbackvorm `parro://oauth2:443/` die voorkomt in de [aanmeldtests van de vastgezette Parro-SDK](https://github.com/anneschuth/parro-cli/blob/4e0de03ff6c47ccaf1d99b1abd7e8b7643f95df0/tests/test_login.py#L118-L120). De eerdere controle wees deze vorm ook bij een correcte `state` af.
@@ -7,7 +17,7 @@
 
 Lokaal gecontroleerd met **200 geslaagde tests**, inclusief de volledige aanmeldketen zonder accountkeuze en accountkeuze via header of XML. Code- en formatteringscontroles slagen.
 
-De nieuwe live aanmeldpoging met 0.1.1 mislukte nog met `state_mismatch`. De SDK-test toont een ondersteunde callbackvorm; de werkelijke callback van die praktijkproef is daarmee niet vastgesteld. Versie 0.1.2 moet opnieuw live worden geprobeerd voordat een geslaagde accountaanmelding kan worden bevestigd.
+Na de update naar 0.1.2 heeft de gebruiker een geslaagde aanmelding en de samenvatting met tellers bevestigd. De eerdere live poging met 0.1.1 mislukte nog met `state_mismatch`; de werkelijke callback van die eerdere poging is niet vastgesteld.
 
 ## 0.1.1 — correctie aanmeldproces
 
@@ -29,4 +39,4 @@ Na installatie van 0.1.1 via HACS en een herstart mislukte de nieuwe live aanmel
 - Beperkte diagnostiek en uitsluitend bijlagemetadata; geen verzenden, markeren, downloads of periodiek ophalen van chatinhoud.
 - Handmatige installatie-ZIP met inventaris en aparte voorbereiding van een HACS-repository.
 
-Lokaal getest met een gemockte Parro-server en Home Assistant Core 2026.8.3. De daaropvolgende download en installatie via HACS zijn bevestigd; de accountaanmelding is nog niet geslaagd. Zie de releasechecklist voor de resterende praktijkproeven.
+Lokaal getest met een gemockte Parro-server en Home Assistant Core 2026.8.3. Download en installatie via HACS zijn daarna bevestigd; de accountaanmelding is later met versie 0.1.2 geslaagd.

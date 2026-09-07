@@ -38,12 +38,19 @@
   "options": {
     "step": {
       "init": {
-        "title": "Ophaalinterval",
-        "description": "Hoe vaak Home Assistant de compacte accountstatus ophaalt (15–240 minuten). Berichtinhoud wordt alleen opgehaald wanneer je een leesactie uitvoert.",
+        "title": "Parro-instellingen",
+        "description": "Kies hoe vaak Home Assistant de tellers bijwerkt (15–240 minuten). Mededelingen en foto’s worden opgehaald wanneer je de kaart opent. Beheerders hebben altijd toegang; selecteer hieronder eventuele andere gebruikers.",
         "data": {
-          "poll_interval": "Ophaalinterval (minuten)"
+          "poll_interval": "Ophaalinterval (minuten)",
+          "dashboard_viewers": "Toegang tot mededelingen en foto’s"
+        },
+        "data_description": {
+          "dashboard_viewers": "Deze gebruikers mogen mededelingen en foto’s van dit Parro-account bekijken. Dit geeft geen toegang tot privégesprekken."
         }
       }
+    },
+    "error": {
+      "invalid_viewers": "Selecteer alleen actieve Home Assistant-gebruikers uit de lijst."
     }
   },
   "entity": {

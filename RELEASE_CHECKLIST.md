@@ -1,38 +1,40 @@
-# Releasechecklist 0.1.2
+# Releasechecklist 0.2.0
 
-Versie 0.1.1 is via HACS geïnstalleerd en opnieuw geprobeerd; de aanmelding mislukte nog met `state_mismatch`. Versie 0.1.2 voegt ondersteuning toe voor de callbackvorm uit de tests van de vastgezette SDK. De werkelijke callback van de praktijkproef is niet vastgesteld. Een nieuwe aanmeldproef blijft nodig. Leg alleen technische uitkomsten vast, zonder namen, schoolinformatie, tokens of privé-URL's.
+Installatie via HACS, aanmelding en de samenvatting met tellers zijn met 0.1.2 door de gebruiker bevestigd. Versie 0.2.0 voegt een dashboardkaart, foto's en toegang per Home Assistant-gebruiker toe. Leg alleen technische testuitkomsten vast; neem geen accountgegevens, schoolinhoud, foto's of privé-URL's op.
 
-## Lokale kandidaat 0.1.2
+## Lokale kandidaat 0.2.0
 
-- [x] Tests uitvoeren tegen Home Assistant Core 2026.8.3 en `parro==1.1.0`; **200 tests geslaagd**.
-- [x] Code- en formatteringscontrole uitvoeren.
-- [x] Regressietests controleren dat de SDK-callbackvorm met poort 443 en afsluitende slash bij exact overeenkomende OAuth-`state` wordt geaccepteerd.
-- [x] Controleren dat afwijkende callbackbestemmingen en ontbrekende, dubbele of afwijkende `state`-waarden worden afgewezen.
-- [x] Controleren dat hervatten zonder nieuwe `state` de oorspronkelijke waarde behoudt en dat technische foutmeldingen uitsluitend veilige foutcategorieën loggen.
-- [x] Actieschema en vertalingen controleren.
-- [ ] Eventueel een nieuwe lokale ZIP bouwen, uitpakken en vergelijken met bron en SHA-256-inventaris; oude ZIP's gelden uitsluitend voor hun oorspronkelijke versie.
-- [x] Pakketinhoud controleren: alleen de integratie en toegestane openbare documentatie; geen overdrachtsnotities, lokale verslagen, tokens of familie- en dashboardbestanden.
+- [x] Volledige tests tegen Home Assistant Core 2026.8.3 en `parro==1.1.0`: 374 geslaagd; daarnaast 14 browsercontroles. Historisch had 0.1.2 200 geslaagde tests.
+- [x] Code- en formatteringscontrole geslaagd; kaart en visuele editor gecontroleerd.
+- [x] Accountselectie en toegang voor beheerder, toegestane gebruiker en gebruiker zonder toegang lokaal gecontroleerd; verzoeken met een ander account-ID, anonieme aanvragen en ingetrokken toegang afgedekt door synthetische tests.
+- [ ] Feedgrenzen van 1–20 mededelingen, vijfminutencache, maximaal één uur oude terugval bij verbindingsfouten en groepsfilter controleren; broncollectie blijft begrensd.
+- [ ] Foto's controleren op geauthenticeerde toegang, begrensde tijdelijke opslag en begrensde afmetingen; geen oorspronkelijke school- of bijlage-URL's in kaartantwoorden.
+- [ ] Bestaande vier acties blijven alleen toegankelijk voor beheerders en automatiseringen, ook wanneer een gebruiker toegang tot de kaart heeft.
+- [x] Automatische registratie en actualisatie van uitsluitend de eigen kaartresource, herhaald registreren en YAML-fallback lokaal gecontroleerd. De statische route levert exact het kaartbestand; andere integratiebestanden zijn niet bereikbaar via die route. Zeven synthetische tests slagen.
+- [x] Veertien synthetische browsertests met de echte kaartcode geslaagd, waaronder accountwissel, ingetrokken toegang, veilige tekstweergave en begrensde fotoweergave. Voorvertoningen voor desktop/licht, mobiel/donker en visuele editor beoordeeld. Zie [de browsertesthandleiding](tests/frontend/README.md).
+- [ ] Actieschema, vertalingen en generiek YAML-voorbeelddashboard controleren.
+- [x] Distributiecontrole geslaagd met 49 synthetische distributietests: één integratie met verplichte backendmodules, exact `frontend/parro-card.js` en de twee toegestane voorbeeldbestanden; ontwikkelhulpbestanden, afhankelijkheidsmappen, screenshots en privégegevens uitgesloten.
+- [ ] Eventuele nieuwe installatie-ZIP uitpakken en vergelijken met bron en SHA-256-inventaris.
 
-## Account- en hostproef
+## Praktijkproef
 
-- [x] Installatie van 0.1.1 via HACS, herstart en nieuwe aanmeldpoging uitgevoerd; aanmelding nog mislukt met `state_mismatch`.
-- [ ] Bijwerken naar 0.1.2, Home Assistant herstarten en een nieuwe aanmelding beginnen.
-- [ ] Eerste geslaagde aanmelding en aanmaak van de Parro-config entry bevestigen.
-- [ ] Expliciete accountkeuze testen als het account meerdere identiteiten aanbiedt; dubbele toevoeging van dezelfde identiteit afwijzen.
-- [ ] Tellers vergelijken met het Parro-account, met onderscheid tussen ongelezen gesprekken en losse berichten.
-- [ ] Tokenverversing, herstart met opgeslagen tokens en heraanmelding met hetzelfde account controleren.
-- [ ] Instelbaar interval en herstellen na netwerkuitval controleren; wijziging van tokens mag geen herlaadlus geven.
-- [ ] Elk van de vier acties één keer begrensd uitvoeren en de leesstatus in Parro vóór en na vergelijken.
-- [ ] Controleren dat sensorattributen en diagnostiek geen berichtinhoud, kindnamen of privé-URL's bevatten.
-- [ ] Verwijderen, herladen en handmatig bijwerken controleren.
+- [x] Installatie via HACS en geslaagde aanmelding met 0.1.2 bevestigd.
+- [x] Samenvatting met tellers na aanmelding door de gebruiker bevestigd.
+- [ ] Bijwerken naar 0.2.0 en Home Assistant herstarten; de geladen versie controleren.
+- [ ] Kaart toevoegen aan een apart proefdashboard en het eigen account in de visuele editor kiezen.
+- [ ] Mededelingen en beschikbare foto's vergelijken met Parro; titel, aantal en groepsfilter controleren.
+- [ ] Andere Home Assistant-gebruiker expliciet toegang geven, met die gebruiker lezen en toegang daarna weer intrekken.
+- [ ] Verifiëren dat er geen berichtinhoud of foto's in sensorattributen of diagnostiek terechtkomen.
+- [ ] Tokenverversing, herstart en heraanmelding met hetzelfde account controleren.
+- [ ] Leesstatus in Parro vóór en na de begrensde leesaanroepen vergelijken.
 
-## Publicatie 0.1.2
+## Publicatie 0.2.0
 
-- [x] Repository `carlmegens/ParroHACS` is openbaar, met codeowner `@carlmegens`, beschrijving en relevante GitHub-topics.
-- [x] Definitieve bron en publicatiemap vergelijken; tests, codecontrole en `scripts/prepare_repository.py --check` uitvoeren.
-- [ ] Gecontroleerde bestanden van 0.1.2 publiceren op `main` en de gepubliceerde inhoud controleren tegen de bron.
-- [ ] Beschikbaarheid van de update in HACS controleren.
-- [ ] Desgewenst een GitHub-release `v0.1.2` publiceren. `hacs.json` gebruikt repositorybestanden en geen ZIP-release.
-- [x] README en wijzigingen bijwerken met uitsluitend daadwerkelijk uitgevoerde proeven en ondersteunde versies.
+- [x] Repository `carlmegens/ParroHACS` is openbaar, met codeowner `@carlmegens`.
+- [ ] Definitieve bron en publicatiemap vergelijken; tests, codecontrole en `scripts/prepare_repository.py --check` uitvoeren.
+- [ ] Alleen gecontroleerde integratiecode, kaart, openbare documentatie, generieke voorbeelden en synthetische tests publiceren.
+- [ ] Gepubliceerde inhoud vergelijken met de bron en beschikbaarheid van de update in HACS controleren.
+- [ ] Desgewenst een GitHub-release `v0.2.0` publiceren. HACS gebruikt de integratierepository; de kaart hoort bij hetzelfde pakket.
+- [ ] README en wijzigingen aanvullen met uitsluitend daadwerkelijk uitgevoerde controles.
 
-De openbare repository bevat daarnaast synthetische tests en hun testconfiguratie. De distributiehelper controleert de lokale bestandsstructuur en metadata; een geslaagde controle bewijst geen live accountwerking.
+Lokale tests en een geslaagde pakketcontrole bewijzen geen volledige werking van de nieuwe kaart met ieder Parro-account of iedere Home Assistant-versie.

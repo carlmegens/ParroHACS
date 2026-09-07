@@ -29,10 +29,14 @@ ROOT_FILES = {
     "RELEASE_CHECKLIST.md",
 }
 CORE_DATA = {"manifest.json", "strings.json", "services.yaml", "icons.json"}
+EXAMPLE_FILES = {"examples/dashboard.yaml", "examples/README.md"}
+FRONTEND_FILE = "frontend/parro-card.js"
 REQUIRED_FILES = {
     "README.md",
     "LICENSE",
     "hacs.json",
+    *EXAMPLE_FILES,
+    f"custom_components/{DOMAIN}/{FRONTEND_FILE}",
     *(
         f"custom_components/parro/{name}"
         for name in (
@@ -41,7 +45,10 @@ REQUIRED_FILES = {
             "config_flow.py",
             "const.py",
             "coordinator.py",
+            "dashboard.py",
             "entity.py",
+            "feed.py",
+            "frontend.py",
             "sensor.py",
             "binary_sensor.py",
             "services.py",
@@ -79,6 +86,21 @@ def payload(root: Path) -> dict[str, bytes]:
         path = root / name
         if path.exists() or path.is_symlink():
             result[name] = read_regular(path)
+    examples = root / "examples"
+    if examples.is_symlink():
+        fail("De voorbeeldmap mag geen symlink zijn.")
+    if examples.exists():
+        for path in sorted(examples.rglob("*")):
+            relative = path.relative_to(root).as_posix()
+            if path.is_symlink():
+                fail(f"Symlink niet toegestaan: {relative}")
+            if path.is_dir():
+                continue
+            if path.name == ".DS_Store":
+                continue
+            if relative not in EXAMPLE_FILES:
+                fail(f"Bestand valt buiten de distributielijst: {relative}")
+            result[relative] = read_regular(path)
     components = root / "custom_components"
     component = components / DOMAIN
     if components.is_symlink() or component.is_symlink() or not component.is_dir():
@@ -94,7 +116,8 @@ def payload(root: Path) -> dict[str, bytes]:
         if path.is_dir():
             continue
         allowed = (
-            (len(relative.parts) == 1 and (path.suffix == ".py" or path.name in CORE_DATA))
+            relative.as_posix() == FRONTEND_FILE
+            or (len(relative.parts) == 1 and (path.suffix == ".py" or path.name in CORE_DATA))
             or (
                 len(relative.parts) == 2
                 and relative.parts[0] == "translations"
@@ -145,7 +168,7 @@ def validate(files: dict[str, bytes], *, release: bool = True) -> None:
     ):
         fail("Manifest vereist domain parro, name, version en config_flow true.")
     if manifest.get("requirements") != ["parro==1.1.0"]:
-        fail("De eerste versie vereist de vastgezette SDK parro==1.1.0.")
+        fail("Deze integratie vereist de vastgezette SDK parro==1.1.0.")
     if release:
         docs = manifest.get("documentation", "")
         if not re.fullmatch(r"https://github\.com/[A-Za-z0-9-]+/[A-Za-z0-9._-]+", docs):
@@ -169,7 +192,7 @@ def validate(files: dict[str, bytes], *, release: bool = True) -> None:
     if not hacs.get("name") or hacs.get("content_in_root", False) or hacs.get("zip_release", False):
         fail("hacs.json moet de gewone custom_components-repositoryindeling gebruiken.")
     if hacs.get("homeassistant") != "2026.8.3":
-        fail("De eerste versie heeft Home Assistant 2026.8.3 als doelminimum.")
+        fail("Deze integratie heeft Home Assistant 2026.8.3 als doelminimum.")
 
 
 def write_archive(files: dict[str, bytes], output: Path) -> None:

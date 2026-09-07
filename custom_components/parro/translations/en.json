@@ -38,12 +38,19 @@
   "options": {
     "step": {
       "init": {
-        "title": "Polling interval",
-        "description": "How often Home Assistant fetches the compact account summary (15–240 minutes). Message content is fetched only when you call a read action.",
+        "title": "Parro settings",
+        "description": "Choose how often Home Assistant updates the counters (15–240 minutes). Announcements and photos are fetched when you open the card. Administrators always have access; select any additional users below.",
         "data": {
-          "poll_interval": "Polling interval (minutes)"
+          "poll_interval": "Polling interval (minutes)",
+          "dashboard_viewers": "Access to announcements and photos"
+        },
+        "data_description": {
+          "dashboard_viewers": "These users may view announcements and photos from this Parro account. This does not grant access to private conversations."
         }
       }
+    },
+    "error": {
+      "invalid_viewers": "Select only active Home Assistant users from the list."
     }
   },
   "entity": {

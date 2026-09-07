@@ -545,6 +545,76 @@ class ParroApi:
             for item in items[:limit]
         ]
 
+    async def _async_fetch_feed_source(
+        self, limit: int = MAX_LIMIT, group_id: str | None = None
+    ) -> dict[str, Any]:
+        """Fetch a bounded private feed source; image URLs must never be exposed.
+
+        Only ParroFeed consumes this method. The public announcement action
+        above deliberately continues to exclude all attachment URLs.
+        """
+        limit = _limit(limit)
+        if group_id is not None and (
+            not isinstance(group_id, str)
+            or not re.fullmatch(r"[0-9]{1,20}", group_id)
+            or int(group_id) <= 0
+        ):
+            raise ParroError("The selected Parro group is unavailable")
+
+        def fetch(client: Any) -> dict[str, Any]:
+            groups = [
+                {"id": _id(group), "name": _text(group.get("name"), 256)}
+                for group in client.get_groups()
+                if _id(group) is not None
+            ]
+            if group_id is not None and group_id not in {group["id"] for group in groups}:
+                raise ParroError("The selected Parro group is unavailable")
+            announcements = client.get_announcements(
+                group_id=int(group_id) if group_id is not None else None, limit=limit
+            )
+            items = []
+            for item in announcements[:limit]:
+                sources = []
+                attachments = item.get("attachments", [])
+                for attachment in attachments[:MAX_LIMIT] if isinstance(attachments, list) else []:
+                    if (
+                        not isinstance(attachment, dict)
+                        or str(attachment.get("attachmentType", "")).lower() != "image"
+                    ):
+                        continue
+                    entries = attachment.get("entries", [])
+                    for entry in entries[:10] if isinstance(entries, list) else []:
+                        if not isinstance(entry, dict) or entry.get("type") != "SOURCE":
+                            continue
+                        url = entry.get("url")
+                        if isinstance(url, str) and 0 < len(url) <= 8192:
+                            sources.append(
+                                {
+                                    "url": url,
+                                    "name": _text(
+                                        attachment.get("name", attachment.get("filename")), 256
+                                    ),
+                                }
+                            )
+                            break
+                    if len(sources) == 3:
+                        break
+                items.append(
+                    {
+                        "id": _id(item),
+                        "title": _text(item.get("title"), 1000),
+                        "contents": _text(item.get("contents")),
+                        "created_at": _text(item.get("createdAt"), 100),
+                        "sort_date": _text(item.get("sortDate"), 100),
+                        "sender": _name(item.get("owner")),
+                        "group_id": _id(item, "group") or group_id,
+                        "image_sources": sources,
+                    }
+                )
+            return {"items": items, "groups": groups}
+
+        return await self._async_call(fetch)
+
     async def async_get_chatrooms(self, limit: int = DEFAULT_LIMIT) -> list[dict[str, Any]]:
         limit = _limit(limit)
         items = await self._async_call(lambda client: client._items_paged("/chatroom", limit))
