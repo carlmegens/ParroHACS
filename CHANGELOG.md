@@ -1,5 +1,17 @@
 # Wijzigingen
 
+## 0.3.0 — lezen vanuit het Parro-apparaat
+
+- De bestaande tellers **Ongelezen mededelingen** en **Ongelezen gesprekken** openen de passende Parro-pop-up. Er zijn geen extra entiteiten of een afzonderlijk dashboard nodig.
+- Voegt een interne apparaatlink naar hetzelfde meegeleverde Parro-scherm toe. De weergave wordt globaal geladen, zodat direct openen vanaf de apparaatpagina werkt; de bestaande integratieopties blijven bereikbaar.
+- Toont een begrensde gesprekkenlijst en berichten uit een gekozen gesprek. Toegang voor andere Home Assistant-gebruikers is apart instelbaar; bestaande toegang tot mededelingen verleent geen gespreksrechten.
+- Gebruikt voor berichtinhoud en beschikbare foto's de geauthenticeerde routes. Sensorattributen bevatten alleen niet-gevoelige verwijzingen naar de pop-up en het account, zonder berichtinhoud, foto's of toegangstokens.
+- Behoudt de dashboardkaart als optionele weergave in hetzelfde installatiepakket.
+
+Lokaal gecontroleerd met 482 Python-tests tegen Home Assistant Core 2026.8.3. De [releasechecklist](RELEASE_CHECKLIST.md) scheidt lokale controles van de praktijkproef.
+
+Gespreksfoto’s volgen het `attachment`-veld van `RChatTextMessage` in de [publieke Parro-webapp](https://talk.parro.com/): afbeeldingsbijlagen gebruiken `attachmentType` en `entries`. Verwijderde berichten worden overgeslagen. Video’s en documenten worden in deze versie niet getoond.
+
 ## 0.2.0 — mededelingen en foto's op het dashboard
 
 - Bundelt `custom:parro-card` met de bestaande HACS-integratie, inclusief visuele accountkeuze, titel, begrensd aantal mededelingen, optionele groepsfilter en fotoweergave.
@@ -8,7 +20,7 @@
 - Registreert de kaartresource bij dashboards die hun resources via de interface beheren, met een handmatige route voor YAML-resources.
 - Voegt een generiek voorbeelddashboard toe. De distributiehelper neemt uitsluitend het vastgelegde kaartbestand en de expliciete voorbeelden mee.
 
-Aanmelding en samenvatting met tellers zijn met 0.1.2 live bevestigd. De nieuwe kaart, fotoweergave en gebruikersrechten vereisen eigen verificatie; de releasechecklist houdt deze bij. De bestaande vier beheerdersacties blijven beschikbaar, waaronder de leesacties voor gesprekken.
+Lokaal gecontroleerd met 374 Python-tests en 14 browsercontroles. Mededelingen, foto's, groepsfilter, automatische kaartregistratie en visuele editor zijn na installatie live gecontroleerd. Toegang en intrekking voor andere gebruikers zijn synthetisch getest. De bestaande vier beheerdersacties blijven beschikbaar, waaronder de leesacties voor gesprekken.
 
 ## 0.1.2 — aanvullende correctie aanmelding
 

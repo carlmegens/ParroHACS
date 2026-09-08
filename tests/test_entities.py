@@ -3,6 +3,7 @@
 from unittest.mock import patch
 
 import pytest
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.parro.api import ParroConnectionError
@@ -27,6 +28,7 @@ async def entity_states(hass, config_entry, mock_api):
 
 
 async def test_compact_states_and_generic_names(hass, config_entry, mock_api, entity_states):
+    assert len(hass.states.async_all()) == 6
     for key, expected in (
         ("children_count", "2"),
         ("groups_count", "3"),
@@ -47,6 +49,36 @@ async def test_compact_states_and_generic_names(hass, config_entry, mock_api, en
     mock_api.async_get_chatrooms.assert_not_awaited()
     mock_api.async_get_messages.assert_not_awaited()
     mock_api.async_get_calendar_urls.assert_not_awaited()
+
+
+async def test_only_existing_unread_counters_have_public_popup_routing(config_entry, entity_states):
+    for key, source in (
+        ("unread_announcements", "announcements"),
+        ("unread_chatrooms", "messages"),
+    ):
+        attributes = dict(entity_states(key).attributes)
+        attributes.pop("friendly_name")
+        assert attributes == {
+            "custom_ui_more_info": "more-info-parro",
+            "parro_config_entry_id": config_entry.entry_id,
+            "parro_source": source,
+        }
+    for key in ("children_count", "groups_count", "last_success", "connectivity"):
+        attributes = entity_states(key).attributes
+        assert "custom_ui_more_info" not in attributes
+        assert not any(key.startswith("parro_") for key in attributes)
+
+
+async def test_device_links_to_its_internal_account_without_private_values(
+    hass, config_entry, entity_states
+):
+    devices = dr.async_entries_for_config_entry(dr.async_get(hass), config_entry.entry_id)
+    assert len(devices) == 1
+    device = devices[0]
+    assert device.configuration_url == f"homeassistant://parro/{config_entry.entry_id}"
+    assert device.name == "Parro"
+    assert "acct-1" not in device.configuration_url
+    assert "synthetic-access" not in device.configuration_url
 
 
 async def test_missing_values_are_unknown_and_zero_remains_zero(

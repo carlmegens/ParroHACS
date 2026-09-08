@@ -245,3 +245,206 @@ async def test_viewer_revoked_on_existing_websocket(
     response = await ws_request(client, {"type": "parro/feed", "config_entry_id": account.entry_id})
     assert response["error"]["code"] == "unauthorized"
     assert account.runtime_data.feed.async_get_feed.await_count == 1
+
+
+@pytest.fixture
+async def chat_account(account):
+    feed = account.runtime_data.chat_feed
+    with (
+        patch.object(
+            feed,
+            "async_get_conversations",
+            AsyncMock(return_value={"items": [{"id": "10", "title": "Synthetic conversation"}]}),
+        ),
+        patch.object(feed, "async_get_messages", AsyncMock(return_value=FEED)),
+        patch.object(
+            feed, "async_get_image", AsyncMock(return_value=(b"synthetic-chat-jpeg", "image/jpeg"))
+        ),
+    ):
+        yield account
+
+
+@pytest.mark.parametrize("permission", [None, "dashboard_viewers", "chat_viewers"])
+async def test_chat_access_does_not_inherit_announcement_permission(
+    hass, chat_account, hass_read_only_user, hass_read_only_access_token, hass_ws_client, permission
+):
+    if permission:
+        hass.config_entries.async_update_entry(
+            chat_account, options={permission: [hass_read_only_user.id]}
+        )
+    client = await hass_ws_client(hass, access_token=hass_read_only_access_token)
+    accounts = await ws_request(client, {"type": "parro/accounts", "source": "messages"})
+    assert bool(accounts["result"]["accounts"]) == (permission == "chat_viewers")
+    announcements = await ws_request(client, {"type": "parro/accounts"})
+    assert bool(announcements["result"]["accounts"]) == (permission == "dashboard_viewers")
+    for kind, fields in [("conversations", {}), ("messages", {"chatroom_id": "10"})]:
+        response = await ws_request(
+            client, {"type": "parro/" + kind, "config_entry_id": chat_account.entry_id, **fields}
+        )
+        assert response["success"] == (permission == "chat_viewers")
+        if permission != "chat_viewers":
+            assert response["error"]["code"] == "unauthorized"
+    if permission != "chat_viewers":
+        chat_account.runtime_data.chat_feed.async_get_messages.assert_not_awaited()
+        chat_account.runtime_data.chat_feed.async_get_conversations.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "suffix", ["conversations", "messages?chatroom_id=10", "chat_image/" + "x" * 32]
+)
+@pytest.mark.parametrize("permission", ["dashboard_viewers", "chat_viewers"])
+async def test_chat_http_uses_separate_acl_and_image_store(
+    hass,
+    chat_account,
+    hass_client,
+    hass_read_only_user,
+    hass_read_only_access_token,
+    suffix,
+    permission,
+):
+    hass.config_entries.async_update_entry(
+        chat_account, options={permission: [hass_read_only_user.id]}
+    )
+    client = await hass_client(hass_read_only_access_token)
+    response = await client.get(f"/api/parro/{chat_account.entry_id}/{suffix}")
+    assert response.status == (200 if permission == "chat_viewers" else 403)
+    assert response.headers["Cache-Control"] == "private, no-store"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+    if permission == "chat_viewers" and suffix.startswith("chat_image"):
+        assert await response.read() == b"synthetic-chat-jpeg"
+    chat_account.runtime_data.feed.async_get_image.assert_not_awaited()
+    chat_account.runtime_data.feed.async_get_feed.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "suffix", ["conversations", "messages?chatroom_id=10", "chat_image/" + "x" * 32]
+)
+@pytest.mark.parametrize("change", ["revoke", "disable_user", "unload", "reload"])
+async def test_chat_access_change_while_reading_withholds_content(
+    hass,
+    chat_account,
+    hass_client,
+    hass_read_only_user,
+    hass_read_only_access_token,
+    suffix,
+    change,
+):
+    hass.config_entries.async_update_entry(
+        chat_account, options={"chat_viewers": [hass_read_only_user.id]}
+    )
+    coordinator = chat_account.runtime_data
+
+    async def changing_read(*args, **kwargs):
+        if change == "revoke":
+            hass.config_entries.async_update_entry(chat_account, options={})
+        elif change == "disable_user":
+            await hass.auth.async_update_user(hass_read_only_user, is_active=False)
+        elif change == "unload":
+            chat_account.mock_state(hass, ConfigEntryState.NOT_LOADED)
+        else:
+            chat_account.runtime_data = object()
+        return (b"private-photo", "image/jpeg") if suffix.startswith("chat_image") else FEED
+
+    method = (
+        "async_get_image"
+        if suffix.startswith("chat_image")
+        else "async_get_" + suffix.split("?")[0]
+    )
+    getattr(coordinator.chat_feed, method).side_effect = changing_read
+    client = await hass_client(hass_read_only_access_token)
+    try:
+        response = await client.get(f"/api/parro/{chat_account.entry_id}/{suffix}")
+        assert response.status in (403, 503)
+        assert "private" not in await response.text()
+    finally:
+        chat_account.runtime_data = coordinator
+
+
+@pytest.mark.parametrize(
+    "suffix", ["conversations", "messages?chatroom_id=10", "chat_image/" + "x" * 32]
+)
+async def test_chat_http_requires_login(chat_account, hass_client_no_auth, suffix):
+    response = await (await hass_client_no_auth()).get(
+        f"/api/parro/{chat_account.entry_id}/{suffix}"
+    )
+    assert response.status == 401
+
+
+@pytest.mark.parametrize(
+    "suffix",
+    [
+        "conversations?limit=51",
+        "conversations?chatroom_id=10",
+        "messages",
+        "messages?chatroom_id=0",
+        "messages?chatroom_id=1&chatroom_id=2",
+        "messages?chatroom_id=1&limit=21",
+        "messages?chatroom_id=1&url=https://example.invalid",
+    ],
+)
+async def test_chat_http_rejects_invalid_input(chat_account, hass_client, suffix):
+    response = await (await hass_client()).get(f"/api/parro/{chat_account.entry_id}/{suffix}")
+    assert response.status == 400
+    chat_account.runtime_data.chat_feed.async_get_messages.assert_not_awaited()
+    chat_account.runtime_data.chat_feed.async_get_conversations.assert_not_awaited()
+
+
+async def test_chat_admin_default_and_service_privilege_remains_separate(
+    hass, chat_account, hass_ws_client, hass_read_only_user
+):
+    client = await hass_ws_client(hass)
+    response = await ws_request(
+        client,
+        {"type": "parro/messages", "config_entry_id": chat_account.entry_id, "chatroom_id": "10"},
+    )
+    assert response["result"] == FEED
+    chat_account.runtime_data.chat_feed.async_get_messages.assert_awaited_once_with(
+        limit=20, chatroom_id="10"
+    )
+    hass.config_entries.async_update_entry(
+        chat_account, options={"chat_viewers": [hass_read_only_user.id]}
+    )
+    with pytest.raises(Unauthorized):
+        await hass.services.async_call(
+            "parro",
+            "get_messages",
+            {"config_entry_id": chat_account.entry_id, "chatroom_id": "10"},
+            blocking=True,
+            return_response=True,
+            context=Context(user_id=hass_read_only_user.id),
+        )
+
+
+@pytest.mark.parametrize("origin", ["feed", "messages", "summary"])
+async def test_auth_expiry_blocks_and_closes_both_content_sources(
+    hass, chat_account, hass_client, hass_ws_client, mock_api, origin
+):
+    coordinator = chat_account.runtime_data
+    client = await hass_ws_client(hass)
+    if origin == "summary":
+        mock_api.async_fetch_summary.side_effect = ParroAuthError("private-token")
+        await coordinator.async_refresh()
+    else:
+        store = coordinator.feed if origin == "feed" else coordinator.chat_feed
+        getattr(store, "async_get_" + origin).side_effect = ParroAuthError("private-token")
+        response = await ws_request(
+            client,
+            {
+                "type": "parro/" + origin,
+                "config_entry_id": chat_account.entry_id,
+                **({"chatroom_id": "10"} if origin == "messages" else {}),
+            },
+        )
+        assert response["error"]["code"] == "authentication_expired"
+    assert coordinator.content_auth_failed
+    assert coordinator.feed._closed and coordinator.chat_feed._closed
+    http = await hass_client()
+    for suffix in [
+        "feed",
+        "messages?chatroom_id=10",
+        "image/" + "x" * 32,
+        "chat_image/" + "x" * 32,
+    ]:
+        response = await http.get(f"/api/parro/{chat_account.entry_id}/{suffix}")
+        assert response.status == 503
+        assert await response.json() == {"code": "authentication_expired"}

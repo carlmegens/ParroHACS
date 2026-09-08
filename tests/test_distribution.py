@@ -30,7 +30,7 @@ def package_source(tmp_path: Path) -> Path:
             {
                 "domain": "parro",
                 "name": "Parro",
-                "version": "0.2.0",
+                "version": "0.3.0",
                 "config_flow": True,
                 "requirements": ["parro==1.1.0"],
                 "codeowners": [],
@@ -179,7 +179,9 @@ def test_second_integration_is_rejected(package_source, tmp_path):
     assert prepare.main(stage_args(package_source, tmp_path / "output")) == 1
 
 
-@pytest.mark.parametrize("filename", ["api.py", "dashboard.py", "feed.py", "frontend.py"])
+@pytest.mark.parametrize(
+    "filename", ["api.py", "chat_feed.py", "dashboard.py", "feed.py", "frontend.py"]
+)
 def test_missing_runtime_file_is_rejected(package_source, tmp_path, filename):
     (package_source / "custom_components/parro" / filename).unlink()
     assert (

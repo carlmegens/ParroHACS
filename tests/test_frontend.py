@@ -2,9 +2,10 @@
 
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from homeassistant.components import frontend, panel_custom
 from homeassistant.components.lovelace.const import LOVELACE_DATA, MODE_STORAGE, MODE_YAML
 from homeassistant.components.lovelace.resources import ResourceStorageCollection
 from homeassistant.setup import async_setup_component
@@ -12,9 +13,18 @@ from homeassistant.setup import async_setup_component
 from custom_components.parro.frontend import (
     CARD_PATH,
     CARD_URL,
+    async_register_interfaces,
     async_register_resource,
     async_setup_frontend,
 )
+
+
+@pytest.fixture
+def modules(hass):
+    """Use the same module URL manager exposed by HA's frontend setup."""
+    manager = frontend.UrlManager(Mock(), [])
+    hass.data[frontend.DATA_EXTRA_MODULE_URL] = manager
+    return manager
 
 
 @pytest.fixture
@@ -82,6 +92,69 @@ async def test_register_card_tolerates_missing_lovelace(hass):
     await async_register_resource(hass)
 
 
+async def test_interfaces_register_globally_and_keep_panel_hidden(hass, modules):
+    await async_register_interfaces(hass)
+    assert modules.urls == {CARD_URL}
+    panel = hass.data[frontend.DATA_PANELS]["parro"]
+    assert panel.sidebar_title is None
+    assert panel.config_panel_domain is None
+    assert panel.require_admin is False  # Content endpoints enforce per-account access.
+    assert panel.config["_panel_custom"]["name"] == "parro-panel"
+    assert panel.config["_panel_custom"]["module_url"] == CARD_URL
+    assert "config_entry_id" not in panel.config
+    with (
+        patch.object(frontend, "add_extra_js_url", wraps=frontend.add_extra_js_url) as add,
+        patch.object(panel_custom, "async_register_panel") as register,
+    ):
+        await async_register_interfaces(hass)
+    add.assert_not_called()
+    register.assert_not_called()
+    assert hass.data[frontend.DATA_PANELS]["parro"] is panel
+
+
+async def test_interfaces_update_only_their_own_module_and_panel(hass, modules):
+    unrelated = "/local/other-interface.js"
+    external = f"https://example.invalid{CARD_PATH}?v=old"
+    old = f"{CARD_PATH}?v=old"
+    for url in (unrelated, external, old):
+        frontend.add_extra_js_url(hass, url)
+    await panel_custom.async_register_panel(hass, "parro", "parro-panel", module_url=old)
+    frontend.async_register_built_in_panel(hass, "other", sidebar_title="Other")
+    other = hass.data[frontend.DATA_PANELS]["other"]
+    await async_register_interfaces(hass)
+    assert modules.urls == {unrelated, external, CARD_URL}
+    assert hass.data[frontend.DATA_PANELS]["other"] is other
+    assert (
+        hass.data[frontend.DATA_PANELS]["parro"].config["_panel_custom"]["module_url"] == CARD_URL
+    )
+
+
+async def test_interfaces_do_not_replace_an_unrelated_panel(hass, modules, caplog):
+    frontend.async_register_built_in_panel(hass, "other", frontend_url_path="parro")
+    existing = hass.data[frontend.DATA_PANELS]["parro"]
+    await async_register_interfaces(hass)
+    assert hass.data[frontend.DATA_PANELS]["parro"] is existing
+    assert modules.urls == {CARD_URL}
+    assert "Parro account panel path is already in use" in caplog.text
+
+
+async def test_interfaces_tolerate_headless_ha(hass):
+    hass.data.pop(frontend.DATA_EXTRA_MODULE_URL, None)
+    await async_register_interfaces(hass)
+    assert "parro" not in hass.data.get(frontend.DATA_PANELS, {})
+
+
+async def test_interface_failure_logs_no_unrelated_data(hass, modules, caplog):
+    with patch.object(
+        panel_custom,
+        "async_register_panel",
+        side_effect=ValueError("SYNTHETIC-PRIVATE-PANEL-CONTENT"),
+    ):
+        await async_register_interfaces(hass)
+    assert "Parro device interface could not be registered" in caplog.text
+    assert "SYNTHETIC-PRIVATE-PANEL-CONTENT" not in caplog.text
+
+
 async def test_resource_failure_is_safe_and_does_not_break_account_setup(hass, caplog):
     collection = SimpleNamespace(
         async_get_info=AsyncMock(side_effect=RuntimeError("SYNTHETIC-PRIVATE-STORAGE-CONTENT"))
@@ -93,14 +166,17 @@ async def test_resource_failure_is_safe_and_does_not_break_account_setup(hass, c
 
 
 async def test_setup_serves_only_bundled_javascript_without_school_data(
-    hass, hass_client_no_auth, config_entry
+    hass, hass_client_no_auth, config_entry, modules
 ):
     assert await async_setup_component(hass, "http", {"http": {}})
     config_entry.add_to_hass(hass)
     hass.states.async_set("sensor.parro_synthetic_private", "SYNTHETIC-PRIVATE-SCHOOL-CONTENT")
     with patch("custom_components.parro.frontend.async_at_started") as at_started:
         await async_setup_frontend(hass)
-    at_started.assert_called_once_with(hass, async_register_resource)
+    at_started.assert_called_once_with(hass, async_register_interfaces)
+    # Global registration happens now, not only on startup or first dashboard visit.
+    assert modules.urls == {CARD_URL}
+    assert "parro" in hass.data[frontend.DATA_PANELS]
     client = await hass_client_no_auth()
     response = await client.get(CARD_URL)
     assert response.status == 200

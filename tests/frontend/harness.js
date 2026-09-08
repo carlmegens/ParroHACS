@@ -1,6 +1,7 @@
 import '../../custom_components/parro/frontend/parro-card.js';
 // Native HA supplies these components. Minimal local mocks keep this harness offline.
 const paths = {
+  'arrow-left': 'M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.42-1.41L7.83 13H20z',
   refresh: 'M17.65 6.35A7.95 7.95 0 0012 4a8 8 0 108 8h-2a6 6 0 11-1.76-4.24L13 11h7V4z',
   'chevron-down': 'M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z',
   'chevron-up': 'M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z',
@@ -33,32 +34,56 @@ const items = [
 ];
 window.fixture = {
   items, calls:[], photoCalls:[], revoked:[], state:params.get('state')||'ready', deferred:[], userId:'synthetic-user', imageStatus:200,
+  pendingTypes:[],
+  conversations:[{id:'101',title:'Contact met het voorbeeldteam',type:'private',sort_date:'2026-09-08T09:30:00+02:00',unread_count:2},{id:'202',title:'Bibliotheekbezoek',type:'group',sort_date:'2026-09-07T13:00:00+02:00',unread_count:0}],
+  chatItems:{
+    '101':[{id:'1001',contents:'Goedemorgen! Hierbij een kleine indruk van het tuinproject. De groep heeft vandaag de eerste plantjes verzorgd.',sender:'Team voorbeeldschool',created_at:'2026-09-08T09:30:00+02:00',images:[{id:'dddddddddddddddddddddddddddddddd',name:'Synthetische gespreksfoto'}]},{id:'1002',contents:'Bedankt voor het bericht. Leuk om te zien waar jullie aan werken!',sender:'Voorbeeldouder',created_at:'2026-09-08T09:15:00+02:00',images:[]}],
+    '202':[{id:'2001',contents:'De boeken voor ons bezoek staan klaar. Neem woensdag de bibliotheekpas mee.',sender:'Voorbeeldteam bibliotheek',created_at:'2026-09-07T13:00:00+02:00',images:[]}],
+  },
+  chatAllowed:true,
   groups:[{id:'10',name:'Voorbeeldgroep A'},{id:'20',name:'Voorbeeldgroep B'}],
   accounts:[{config_entry_id:'example-account',title:'Voorbeeldschool'},{config_entry_id:'second-account',title:'Tweede voorbeeldaccount'}],
 };
 const originalRevoke=URL.revokeObjectURL.bind(URL);URL.revokeObjectURL=(url)=>{fixture.revoked.push(url);originalRevoke(url);};
 window.makeHass = (userId=fixture.userId) => ({
+  devices:{'synthetic-device':{id:'synthetic-device',config_entries:['example-account']}},
   user:{id:userId},locale:{language:params.get('lang')||'nl'},
   async callWS(request) {
     fixture.calls.push({...request});
-    if(request.type==='parro/feed' && (!Number.isInteger(request.limit) || request.limit<1 || request.limit>20 || (request.group_id && !/^[1-9][0-9]{0,19}$/.test(request.group_id)))) throw {code:'invalid_format'};
-    if (request.type === 'parro/accounts') return {accounts:fixture.state==='noaccount'?[]:fixture.accounts};
-    if (fixture.state === 'loading') return new Promise((resolve,reject)=>fixture.deferred.push({resolve,reject,request}));
+    if(['parro/feed','parro/messages'].includes(request.type) && (!Number.isInteger(request.limit) || request.limit<1 || request.limit>20 || (request.group_id && !/^[1-9][0-9]{0,19}$/.test(request.group_id)))) throw {code:'invalid_format'};
+    if(request.type==='parro/messages' && !/^[1-9][0-9]{0,19}$/.test(request.chatroom_id)) throw {code:'invalid_format'};
+    if(request.type==='parro/conversations' && request.limit!==50) throw {code:'invalid_format'};
+    if (request.type === 'parro/accounts') return {accounts:fixture.state==='noaccount'||(request.source==='messages'&&!fixture.chatAllowed)?[]:fixture.accounts};
+    if (fixture.state === 'loading' || fixture.pendingTypes.includes(request.type)) return new Promise((resolve,reject)=>fixture.deferred.push({resolve,reject,request}));
     if (['unauthorized','not_loaded','cannot_connect','authentication_expired','unsupported_response'].includes(fixture.state)) throw {code:fixture.state,message:'Never show this private raw error'};
+    if(request.type==='parro/conversations') return {items:fixture.state==='noConversations'?[]:fixture.conversations,returned:fixture.conversations.length,limit:50};
+    if(request.type==='parro/messages') {
+      const selected=fixture.state==='empty'?[]:(fixture.chatItems[request.chatroom_id]||[]).slice(0,request.limit);
+      return {items:selected,conversation:fixture.conversations.find(room=>room.id===request.chatroom_id),returned:selected.length,limit:request.limit,updated_at:'2026-09-08T09:35:00+02:00',stale:false};
+    }
     const selected=fixture.state==='empty'?[]:fixture.items.filter(item=>!request.group_id || item.group_id===request.group_id).slice(0,request.limit);
     return {items:selected,groups:fixture.groups,returned:selected.length,limit:request.limit,updated_at:'2026-09-08T09:00:00+02:00',stale:fixture.state==='stale'};
   },
   async fetchWithAuth(url, options={}) {
     fixture.photoCalls.push(url);
-    if(!/^\/api\/parro\/(example-account|second-account)\/image\/[A-Za-z0-9_-]{32}$/.test(url)) return new Response(null,{status:400});
+    if(!/^\/api\/parro\/(example-account|second-account)\/(image|chat_image)\/[A-Za-z0-9_-]{32}$/.test(url)) return new Response(null,{status:400});
     const blob=await imageBlob();
     if(options.signal?.aborted) throw new DOMException('Aborted','AbortError');
     return new Response(blob,{status:fixture.imageStatus,headers:{'Content-Type':'image/png'}});
   },
 });
-window.card=document.createElement('parro-card');
-card.setConfig({type:'custom:parro-card',config_entry_id:params.get('state')==='choose'?'':'example-account',limit:5,show_images:true});
-card.hass=makeHass();document.getElementById('mount').append(card);
+const source=params.get('source')==='messages'?'messages':'announcements';
+const config={type:'custom:parro-card',config_entry_id:params.get('state')==='choose'?'':'example-account',source,limit:5,show_images:true,...(params.has('room')?{chatroom_id:params.get('room')}: {})};
+const mount=document.getElementById('mount');
+if(params.get('surface')==='popup') {
+  window.surface=document.createElement('more-info-parro');surface.stateObj={entity_id:'sensor.synthetic_parro',attributes:{parro_config_entry_id:'example-account',parro_source:source}};surface.hass=makeHass();
+  mount.className='popup';mount.append(surface);window.card=surface._card;
+} else if(params.get('surface')==='panel') {
+  window.surface=document.createElement('parro-panel');surface.route={path:params.has('chooseAccount')?'/':'/example-account'};surface.hass=makeHass();
+  mount.className='panel';mount.append(surface);window.card=surface._card;
+} else {
+  window.card=document.createElement('parro-card');card.setConfig(config);card.hass=makeHass();mount.append(card);
+}
 if(params.has('editor')) {
   document.getElementById('editor').hidden=false;
   window.editor=document.createElement('parro-card-editor');editor.setConfig(card._config);editor.hass=makeHass();

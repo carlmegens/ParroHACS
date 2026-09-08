@@ -1,6 +1,12 @@
-/* Parro card 0.2.0 — content stays in this card's memory, never in entity states. */
+/* Parro card 0.3.0 — content stays in this card's memory, never in entity states. */
 const STRINGS = {
   nl: {
+    announcements: 'Mededelingen', conversations: 'Gesprekken', source: 'Inhoud', conversation: 'Gesprek', message: 'Bericht',
+    chooseConversation: 'Kies een gesprek', chooseConversationHint: 'Selecteer hierboven het gesprek dat je wilt lezen.',
+    noConversations: 'Geen gesprekken', noConversationsHint: 'Er zijn geen gesprekken beschikbaar voor dit account.',
+    conversationUnavailable: 'Gesprek niet beschikbaar', conversationUnavailableHint: 'Selecteer een ander gesprek of controleer de kaartinstellingen.',
+    emptyMessages: 'Geen berichten', emptyMessagesHint: 'Er zijn nog geen berichten in dit gesprek.',
+    selectOnCard: 'Kiezen in de kaart', openParro: 'Open Parro', backIntegration: 'Terug naar de Parro-integratie', backDevice: 'Terug naar het apparaat',
     messages: 'Schoolberichten', refresh: 'Vernieuwen', loading: 'Berichten ophalen…',
     empty: 'Geen mededelingen', emptyHint: 'Er zijn geen mededelingen voor deze selectie.',
     choose: 'Kies een Parro-account', chooseHint: 'Open de kaartinstellingen en selecteer je account.',
@@ -18,6 +24,12 @@ const STRINGS = {
     untitled: 'Mededeling', retry: 'Opnieuw proberen', noGroups: 'Groepen ophalen…',
   },
   en: {
+    announcements: 'Announcements', conversations: 'Conversations', source: 'Content', conversation: 'Conversation', message: 'Message',
+    chooseConversation: 'Choose a conversation', chooseConversationHint: 'Select the conversation you want to read above.',
+    noConversations: 'No conversations', noConversationsHint: 'No conversations are available for this account.',
+    conversationUnavailable: 'Conversation unavailable', conversationUnavailableHint: 'Select another conversation or check the card settings.',
+    emptyMessages: 'No messages', emptyMessagesHint: 'There are no messages in this conversation yet.',
+    selectOnCard: 'Choose in the card', openParro: 'Open Parro', backIntegration: 'Back to the Parro integration', backDevice: 'Back to the device',
     messages: 'School announcements', refresh: 'Refresh', loading: 'Loading announcements…',
     empty: 'No announcements', emptyHint: 'There are no announcements for this selection.',
     choose: 'Choose a Parro account', chooseHint: 'Open the card settings and select your account.',
@@ -63,12 +75,18 @@ const button = (label, action, className = 'icon-button') => {
 };
 const configValue = (input) => {
   if (!input || (input.type && input.type !== 'custom:parro-card')) throw new Error('Expected custom:parro-card');
+  const source = input.source ?? 'announcements';
+  if (!['announcements', 'messages'].includes(source)) throw new Error('source must be announcements or messages');
+  const chatroom = safeText(input.chatroom_id, 20);
+  if (input.chatroom_id && (typeof input.chatroom_id !== 'string' || !/^[1-9][0-9]{0,19}$/.test(input.chatroom_id))) throw new Error('chatroom_id must be a positive numeric string');
   const limit = input.limit ?? 5;
   if (!Number.isInteger(limit) || limit < 1 || limit > 20) throw new Error('limit must be an integer from 1 to 20');
   return {
     type: 'custom:parro-card',
     config_entry_id: safeText(input.config_entry_id, 128),
     group_id: safeText(input.group_id, 128),
+    source,
+    chatroom_id: chatroom,
     title: safeText(input.title, 160),
     limit,
     show_images: input.show_images !== false,
@@ -76,7 +94,11 @@ const configValue = (input) => {
 };
 const CSS = `
   :host { display:block; font-family:var(--ha-font-family-body,Roboto, sans-serif); color:var(--primary-text-color,#212121); }
+  :host([embedded]) ha-card { border:0; border-radius:0; background:transparent; }
   * { box-sizing:border-box; }
+  .conversation-picker { padding:0 16px 16px; display:grid; gap:6px; }
+  .conversation-picker label { color:var(--secondary-text-color,#606060); }
+  .conversation-title { margin:0; font-size:16px; font-weight:500; overflow-wrap:anywhere; }
   ha-card { display:block; background:var(--ha-card-background,var(--card-background-color,#fff)); border:var(--ha-card-border-width,1px) solid var(--ha-card-border-color,var(--divider-color,#e0e0e0)); border-radius:var(--ha-card-border-radius,12px); overflow:hidden; }
   button,input,select { font:inherit; color:inherit; caret-color:var(--primary-color,#03a9f4); }
   button { cursor:pointer; -webkit-tap-highlight-color:transparent; }
@@ -145,6 +167,8 @@ class ParroCard extends HTMLElement {
     this._epoch = 0;
     this._mediaEpoch = 0;
     this._expanded = new Set();
+    this._conversations = [];
+    this._roomId = '';
     this._urls = new Map();
     this._controllers = new Set();
     this._loadingPhotoIds = new Set();
@@ -162,6 +186,7 @@ class ParroCard extends HTMLElement {
     if (JSON.stringify(config) === JSON.stringify(this._config)) return;
     this._config = config;
     this._discard();
+    this._roomId = config.chatroom_id;
     this._render();
     this._load();
   }
@@ -172,7 +197,7 @@ class ParroCard extends HTMLElement {
     this._hass = value;
     this._user = user;
     this._language = locale(value);
-    if (changedUser) { this._discard(); this._render(); this._load(); }
+    if (changedUser) { this._discard(); this._roomId = this._config.chatroom_id; this._render(); this._load(); }
     else if (!this._started) this._load();
     else if (changedLanguage) this._render();
   }
@@ -213,6 +238,7 @@ class ParroCard extends HTMLElement {
     clearTimeout(this._timer);
     this._clearPhotos();
     this._data = null;
+    this._conversations = [];
     this._error = null;
     this._loading = false;
     this._started = false;
@@ -228,15 +254,27 @@ class ParroCard extends HTMLElement {
     this._error = null;
     this._render();
     try {
-      const response = await hass.callWS({ type: 'parro/accounts' });
+      const response = await hass.callWS({ type: 'parro/accounts', ...(this._config.source === 'messages' ? { source: 'messages' } : {}) });
       if (epoch !== this._epoch) return;
       const accounts = Array.isArray(response?.accounts) ? response.accounts : [];
-      if (!accounts.length) { this._error = 'noAccounts'; this._data = null; this._clearPhotos(); return; }
+      if (!accounts.length) { this._error = 'noAccounts'; this._data = null; this._conversations = []; this._clearPhotos(); return; }
       const account = this._config.config_entry_id;
       if (!account) { this._error = 'choose'; this._data = null; return; }
-      if (!accounts.some((item) => item.config_entry_id === account)) { this._error = 'unauthorized'; this._data = null; this._clearPhotos(); return; }
-      const request = { type: 'parro/feed', config_entry_id: account, limit: this._config.limit };
-      if (this._config.group_id) request.group_id = this._config.group_id;
+      if (!accounts.some((item) => item.config_entry_id === account)) { this._error = 'unauthorized'; this._data = null; this._conversations = []; this._clearPhotos(); return; }
+      let request;
+      if (this._config.source === 'messages') {
+        const rooms = await hass.callWS({ type: 'parro/conversations', config_entry_id: account, limit: 50 });
+        if (epoch !== this._epoch) return;
+        if (!Array.isArray(rooms?.items)) throw { code: 'unsupported_response' };
+        this._conversations = rooms.items.slice(0, 50).filter((room) => room && typeof room.id === 'string' && /^[1-9][0-9]{0,19}$/.test(room.id));
+        if (!this._conversations.length) { this._data = null; this._clearPhotos(); this._error = 'noConversations'; return; }
+        if (!this._roomId) { this._data = null; this._error = 'chooseConversation'; return; }
+        if (!this._conversations.some((room) => room.id === this._roomId)) { this._data = null; this._clearPhotos(); this._error = 'conversationUnavailable'; return; }
+        request = { type: 'parro/messages', config_entry_id: account, chatroom_id: this._roomId, limit: this._config.limit };
+      } else {
+        request = { type: 'parro/feed', config_entry_id: account, limit: this._config.limit };
+        if (this._config.group_id) request.group_id = this._config.group_id;
+      }
       const data = await hass.callWS(request);
       if (epoch !== this._epoch) return;
       if (!Array.isArray(data?.items)) throw { code: 'unsupported_response' };
@@ -246,6 +284,7 @@ class ParroCard extends HTMLElement {
     } catch (error) {
       if (epoch !== this._epoch) return;
       this._data = null;
+      this._conversations = [];
       this._error = errorCode(error);
       this._expanded.clear();
       this._clearPhotos();
@@ -257,6 +296,9 @@ class ParroCard extends HTMLElement {
         this._schedule();
       }
     }
+  }
+  _selectRoom(id) {
+    this._discard(); this._roomId = id; this._render(); this._load();
   }
   _schedule() {
     clearTimeout(this._timer);
@@ -270,17 +312,38 @@ class ParroCard extends HTMLElement {
     return new Intl.DateTimeFormat(this._language || 'en', { dateStyle: 'medium', ...(includeTime ? { timeStyle: 'short' } : {}) }).format(date);
   }
   _render() {
+    const active = this.shadowRoot.activeElement;
+    let pageActive = document.activeElement;
+    while (pageActive?.shadowRoot?.activeElement) pageActive = pageActive.shadowRoot.activeElement;
+    const focusId = ['conversation', 'refresh'].includes(active?.id) ? active.id
+      : !active && (pageActive === document.body || pageActive === this) ? this._pendingFocus : null;
+    this._pendingFocus = null;
     const t = words(this._hass);
     const style = el('style'); style.textContent = CSS;
     const card = el('ha-card');
     const header = el('div', 'header');
     const heading = el('div', 'heading');
-    heading.append(el('h2', '', this._config.title || 'Parro'), el('p', 'subtitle', t.messages));
+    heading.append(el('h2', '', this._config.title || 'Parro'), el('p', 'subtitle', this._config.source === 'messages' ? t.conversations : t.messages));
     const refresh = button(t.refresh, () => this._load(true));
+    refresh.id = 'refresh';
     refresh.append(icon('refresh'));
     refresh.disabled = this._loading || !this._hass;
     header.append(heading, refresh); card.append(header);
     card.setAttribute('aria-busy', String(Boolean(this._loading)));
+    if (this._config.source === 'messages' && this._conversations.length) {
+      const picker = el('div', 'conversation-picker');
+      if (this._config.chatroom_id) {
+        picker.append(el('p', 'conversation-title', safeText(this._conversations.find((room) => room.id === this._roomId)?.title, 500) || t.conversation));
+      } else {
+        const label = el('label', '', t.conversation); label.htmlFor = 'conversation';
+        const select = el('select'); select.id = 'conversation';
+        const empty = el('option', '', t.chooseConversation); empty.value = ''; select.append(empty);
+        for (const room of this._conversations) { const option = el('option', '', safeText(room.title, 500) || t.conversation); option.value = room.id; select.append(option); }
+        select.value = this._roomId; select.disabled = this._loading;
+        select.addEventListener('change', () => this._selectRoom(select.value)); picker.append(label, select);
+      }
+      card.append(picker);
+    }
     if (this._loading && !this._data) {
       const skeleton = el('div', 'skeleton');
       skeleton.setAttribute('role', 'status'); skeleton.setAttribute('aria-label', t.loading);
@@ -291,10 +354,10 @@ class ParroCard extends HTMLElement {
       }
       card.append(skeleton);
     } else if (this._error || !this._data?.items.length) {
-      const key = this._error || (this._data ? 'empty' : 'choose');
-      const state = el('div', 'state'); state.setAttribute('role', this._error && !['choose', 'noAccounts'].includes(key) ? 'alert' : 'status');
+      const key = this._error || (this._data ? (this._config.source === 'messages' ? 'emptyMessages' : 'empty') : 'choose');
+      const state = el('div', 'state'); state.setAttribute('role', this._error && !['choose', 'noAccounts', 'chooseConversation', 'noConversations'].includes(key) ? 'alert' : 'status');
       state.append(icon(key === 'empty' ? 'message-text-outline' : key === 'unauthorized' ? 'lock-outline' : 'school-outline'), el('h3', '', t[key]), el('p', '', t[`${key}Hint`]));
-      if (!['choose', 'noAccounts', 'empty'].includes(key)) {
+      if (!['choose', 'noAccounts', 'empty', 'emptyMessages', 'chooseConversation', 'noConversations'].includes(key)) {
         const retry = button(t.retry, () => this._load(true), 'text-button'); retry.textContent = t.retry; state.append(retry);
       }
       card.append(state);
@@ -306,12 +369,12 @@ class ParroCard extends HTMLElement {
         const article = el('article');
         const meta = el('div', 'meta');
         meta.append(el('span', 'group', safeText(item.group_name, 160)));
-        const date = el('time', '', this._date(item.created_at || item.sort_date));
+        const date = el('time', '', this._date(item.created_at || item.sort_date, this._config.source === 'messages'));
         if (date.textContent) date.dateTime = safeText(item.created_at || item.sort_date, 100);
         meta.append(date); article.append(meta);
         const key = `${index}:${safeText(item.id, 128)}`;
         const expanded = this._expanded.has(key);
-        const title = safeText(item.title, 1000) || t.untitled;
+        const title = safeText(item.title, 1000) || (this._config.source === 'messages' ? safeText(item.sender, 256) || t.message : t.untitled);
         const h3 = el('h3');
         const toggle = button(`${expanded ? t.close : t.read}: ${title}`, () => {
           if (expanded) this._expanded.delete(key); else this._expanded.add(key);
@@ -320,7 +383,7 @@ class ParroCard extends HTMLElement {
         }, 'toggle');
         toggle.dataset.index = index; toggle.setAttribute('aria-expanded', String(expanded)); toggle.setAttribute('aria-controls', `body-${index}`);
         toggle.append(el('span', '', title), icon(expanded ? 'chevron-up' : 'chevron-down')); h3.append(toggle); article.append(h3);
-        if (item.sender) article.append(el('p', 'meta sender', safeText(item.sender, 256)));
+        if (item.sender && this._config.source !== 'messages') article.append(el('p', 'meta sender', safeText(item.sender, 256)));
         const contents = safeText(item.contents);
         const body = el('p', 'body', expanded || contents.length <= 180 ? contents : `${contents.slice(0, 180).trimEnd()}…`);
         body.id = `body-${index}`; article.append(body);
@@ -346,6 +409,13 @@ class ParroCard extends HTMLElement {
       if (updated) { const footer = el('div', 'footer'); footer.append(icon('clock-outline'), el('span', '', `${t.updated} ${updated}`)); card.append(footer); }
     }
     this.shadowRoot.replaceChildren(style, card);
+    // Loading temporarily removes or disables these controls. Restore only if
+    // focus has not moved elsewhere while the request was in flight.
+    if (focusId && this.isConnected) {
+      const target = this.shadowRoot.getElementById(focusId);
+      if (target && !target.disabled) target.focus({ preventScroll: true });
+      else if (this._loading || !this._started) this._pendingFocus = focusId;
+    }
     this._observePhotos();
   }
   _observePhotos() {
@@ -374,7 +444,7 @@ class ParroCard extends HTMLElement {
     const mediaEpoch = this._mediaEpoch;
     const controller = new AbortController(); this._controllers.add(controller);
     try {
-      const response = await this._hass.fetchWithAuth(`/api/parro/${encodeURIComponent(this._config.config_entry_id)}/image/${encodeURIComponent(id)}`, { signal: controller.signal });
+      const response = await this._hass.fetchWithAuth(`/api/parro/${encodeURIComponent(this._config.config_entry_id)}/${this._config.source === 'messages' ? 'chat_image' : 'image'}/${encodeURIComponent(id)}`, { signal: controller.signal });
       if (epoch !== this._epoch || mediaEpoch !== this._mediaEpoch || !this._eligible()) return;
       if (response.status === 401 || response.status === 403) {
         this._discard(); this._error = 'unauthorized'; this._started = true; this._loadedAt = Date.now();
@@ -414,10 +484,12 @@ class ParroCardEditor extends HTMLElement {
   constructor() { super(); this.attachShadow({ mode: 'open' }); this._config = configValue({}); this._accounts = []; this._groups = []; this._epoch = 0; }
   setConfig(value) {
     const next = configValue(value);
+    const sourceChanged = this._config.source !== next.source;
     const accountChanged = this._config.config_entry_id !== next.config_entry_id;
     this._config = next;
     this._render();
-    if (accountChanged) this._loadGroups();
+    if (sourceChanged) this._loadAccounts();
+    else if (accountChanged) this._loadGroups();
   }
   set hass(value) {
     const changed = !this._hass || this._hass.user?.id !== value?.user?.id;
@@ -432,7 +504,7 @@ class ParroCardEditor extends HTMLElement {
     if (!this._hass) return;
     const epoch = ++this._epoch; this._started = true; this._loading = true; this._error = null; this._accounts = []; this._groups = []; this._render();
     try {
-      const result = await this._hass.callWS({ type: 'parro/accounts' });
+      const result = await this._hass.callWS({ type: 'parro/accounts', ...(this._config.source === 'messages' ? { source: 'messages' } : {}) });
       if (epoch !== this._epoch) return;
       this._accounts = Array.isArray(result?.accounts) ? result.accounts : [];
       this._loading = false;
@@ -447,9 +519,9 @@ class ParroCardEditor extends HTMLElement {
     if (!this._hass || !account || !this._accounts.some((item) => item.config_entry_id === account)) { this._render(); return; }
     this._groupsLoading = true; this._render();
     try {
-      const result = await this._hass.callWS({ type: 'parro/feed', config_entry_id: account, limit: 1 });
+      const result = await this._hass.callWS(this._config.source === 'messages' ? { type: 'parro/conversations', config_entry_id: account, limit: 50 } : { type: 'parro/feed', config_entry_id: account, limit: 1 });
       if (epoch !== this._epoch) return;
-      this._groups = Array.isArray(result?.groups) ? result.groups : [];
+      this._groups = this._config.source === 'messages' ? (Array.isArray(result?.items) ? result.items.slice(0, 50).map((room) => ({ id: room.id, name: room.title })) : []) : (Array.isArray(result?.groups) ? result.groups : []);
       this._error = null;
     } catch (error) {
       if (epoch !== this._epoch) return;
@@ -459,9 +531,9 @@ class ParroCardEditor extends HTMLElement {
   }
   _change(key, value) {
     this._config = { ...this._config, [key]: value };
-    if (key === 'config_entry_id') { this._config.group_id = ''; this._groups = []; this._loadGroups(); }
+    if (key === 'config_entry_id' || key === 'source') { this._config.group_id = ''; this._config.chatroom_id = ''; this._groups = []; if (key === 'source') this._loadAccounts(); else this._loadGroups(); }
     const config = { ...this._config };
-    for (const optional of ['title', 'group_id', 'config_entry_id']) if (!config[optional]) delete config[optional];
+    for (const optional of ['title', 'group_id', 'chatroom_id', 'config_entry_id']) if (!config[optional]) delete config[optional];
     this.dispatchEvent(new CustomEvent('config-changed', { detail: { config }, bubbles: true, composed: true }));
   }
   _render() {
@@ -472,10 +544,12 @@ class ParroCardEditor extends HTMLElement {
       for (const entry of entries) { const option = el('option', '', entry.name); option.value = entry.id; node.append(option); }
       node.value = this._config[name]; node.addEventListener('change', () => this._change(name, node.value)); return node;
     };
+    const source = select('source', [{ id: 'announcements', name: t.announcements }, { id: 'messages', name: t.conversations }], t.source); source.firstElementChild.remove(); field('source', t.source, source);
     const account = select('config_entry_id', this._accounts.map((item) => ({ id: safeText(item.config_entry_id, 128), name: safeText(item.title, 160) || 'Parro' })), t.choose);
     account.disabled = this._loading || !this._accounts.length; field('config_entry_id', t.account, account).append(el('p', 'hint', t.editorHint));
-    const group = select('group_id', this._groups.map((item) => ({ id: safeText(item.id, 128), name: safeText(item.name, 160) })), this._groupsLoading ? t.noGroups : t.allGroups);
-    group.disabled = this._groupsLoading || !this._config.config_entry_id; field('group_id', t.group, group);
+    const selection = this._config.source === 'messages' ? 'chatroom_id' : 'group_id';
+    const group = select(selection, this._groups.map((item) => ({ id: safeText(item.id, 128), name: safeText(item.name, 160) })), this._groupsLoading ? t.loading : this._config.source === 'messages' ? t.selectOnCard : t.allGroups);
+    group.disabled = this._groupsLoading || !this._config.config_entry_id; field(selection, this._config.source === 'messages' ? t.conversation : t.group, group);
     const title = el('input'); title.type = 'text'; title.value = this._config.title; title.placeholder = 'Parro'; title.maxLength = 160; title.addEventListener('change', () => this._change('title', title.value)); field('title', t.title, title);
     const limit = el('input'); limit.type = 'number'; limit.min = '1'; limit.max = '20'; limit.step = '1'; limit.value = this._config.limit; limit.addEventListener('change', () => { if (limit.reportValidity() && Number.isInteger(limit.valueAsNumber)) this._change('limit', limit.valueAsNumber); }); field('limit', t.limit, limit);
     const checkbox = el('label', 'checkbox'); const images = el('input'); images.type = 'checkbox'; images.checked = this._config.show_images; images.addEventListener('change', () => this._change('show_images', images.checked)); checkbox.append(images, el('span', '', t.images)); form.append(checkbox, el('p', 'hint', t.imageHint));
@@ -484,7 +558,132 @@ class ParroCardEditor extends HTMLElement {
   }
 }
 
+// Home Assistant owns the surrounding more-info dialog and its focus management.
+const deviceForAccount = (hass, account) => Object.values(hass?.devices || {}).find((device) => Array.isArray(device.config_entries) && device.config_entries.includes(account))?.id;
+const internalLink = (label, path) => { const link = el('a', 'text-button', label); link.href = path; return link; };
+const SURFACE_CSS = `${CSS}
+  :host { min-width:0; }
+  a.text-button { display:inline-flex; align-items:center; text-decoration:none; }
+  .surface-link { padding:0 16px 12px; }
+  .panel-shell { min-height:100%; background:var(--primary-background-color,#fafafa); }
+  .panel-toolbar { display:flex; align-items:center; gap:12px; padding:8px 16px; min-height:64px; background:var(--app-header-background-color,var(--primary-background-color,#fafafa)); color:var(--app-header-text-color,var(--primary-text-color,#212121)); border-bottom:1px solid var(--divider-color,#e0e0e0); }
+  .panel-toolbar h1 { margin:0; font-size:20px; font-weight:400; }
+  .panel-content { max-width:800px; padding:20px 24px 32px; margin:0 auto; }
+  .tabs { display:flex; border-bottom:1px solid var(--divider-color,#e0e0e0); margin-bottom:20px; }
+  .tab { flex:1; min-height:48px; border:0; border-bottom:2px solid transparent; padding:12px; background:transparent; color:var(--secondary-text-color,#606060); font-weight:500; }
+  .tab[aria-selected=true] { border-bottom-color:var(--primary-color,#03a9f4); color:var(--primary-text-color,#212121); }
+  .tab:hover { background:var(--secondary-background-color,#f5f5f5); }
+  .panel-account { display:grid; gap:6px; margin-bottom:20px; }
+  @media(max-width:600px) { .panel-content { padding:12px 12px 24px; } }
+`;
+class MoreInfoParro extends HTMLElement {
+  constructor() { super(); this.attachShadow({ mode: 'open' }); }
+  set hass(value) { this._hass = value; this._sync(); }
+  set stateObj(value) { this._stateObj = value; this._sync(); }
+  connectedCallback() { this._sync(); }
+  _sync() {
+    if (!this.isConnected) return;
+    if (!this._card) {
+      const style = el('style'); style.textContent = SURFACE_CSS;
+      this._card = el('parro-card'); this._card.setAttribute('embedded', '');
+      this._links = el('div', 'surface-link'); this.shadowRoot.replaceChildren(style, this._card, this._links);
+    }
+    const attrs = this._stateObj?.attributes || {};
+    const account = safeText(attrs.parro_config_entry_id, 128);
+    const source = attrs.parro_source === 'messages' ? 'messages' : 'announcements';
+    this._card.setConfig({ type: 'custom:parro-card', config_entry_id: account, source, limit: 20, show_images: true });
+    if (this._stateObj) this._card.hass = this._hass;
+    const signature = `${account}|${source}|${locale(this._hass)}`;
+    if (this._linkSignature !== signature) {
+      this._linkSignature = signature;
+      this._links.replaceChildren(...(account ? [internalLink(words(this._hass).openParro, `/parro/${encodeURIComponent(account)}?source=${source}`)] : []));
+    }
+  }
+}
+
+// This panel is registered without a sidebar item. It is reached from the device.
+class ParroPanel extends HTMLElement {
+  constructor() { super(); this.attachShadow({ mode: 'open' }); this._source = 'announcements'; this._accounts = []; this._epoch = 0; this._account = ''; }
+  set hass(value) {
+    const changed = !this._hass || this._hass.user?.id !== value?.user?.id;
+    this._hass = value;
+    if (changed) { this._epoch++; this._accounts = []; this._account = ''; this._context = ''; }
+    this._sync();
+  }
+  set route(value) {
+    this._route = value;
+    const query = new URLSearchParams(String(value?.path || '').split('?')[1] || window.location.search);
+    if (['messages', 'announcements'].includes(query.get('source'))) this._source = query.get('source');
+    this._sync();
+  }
+  set panel(value) { this._panel = value; this._sync(); }
+  set narrow(value) { this.toggleAttribute('narrow', Boolean(value)); }
+  connectedCallback() { this._sync(); }
+  disconnectedCallback() { this._epoch++; this._accounts = []; this._context = ''; this._account = ''; if (this._card) this._renderControls(); }
+  _routeAccount() {
+    let value;
+    try { value = decodeURIComponent(String(this._route?.path || '').split('?')[0].replace(/^\/parro(?=\/|$)/, '').replace(/^\//, '').replace(/\/$/, '')); } catch { return ''; }
+    return /^[A-Za-z0-9_-]{1,128}$/.test(value) ? value : '';
+  }
+  _sync() {
+    if (!this.isConnected) return;
+    const routeAccount = this._routeAccount();
+    const context = `${routeAccount}|${this._source}|${this._hass?.user?.id || ''}|${locale(this._hass)}`;
+    if (!this._card) {
+      const style = el('style'); style.textContent = SURFACE_CSS;
+      const shell = el('div', 'panel-shell'); this._toolbar = el('div', 'panel-toolbar');
+      const main = el('main', 'panel-content'); this._controls = el('div');
+      this._card = el('parro-card'); this._card.id = 'parro-content'; this._card.setAttribute('role', 'tabpanel');
+      main.append(this._controls, this._card); shell.append(this._toolbar, main); this.shadowRoot.replaceChildren(style, shell);
+    }
+    if (context !== this._context) {
+      this._epoch++; this._context = context; this._accounts = []; this._account = routeAccount;
+      this._renderControls();
+      if (!routeAccount && this._hass) this._loadAccounts();
+    }
+    this._syncCard();
+  }
+  _syncCard() {
+    this._card.setConfig({ type: 'custom:parro-card', config_entry_id: this._account, source: this._source, limit: 20, show_images: true });
+    this._card.hass = this._hass;
+  }
+  async _loadAccounts() {
+    const epoch = ++this._epoch; this._accountError = null;
+    try {
+      const result = await this._hass.callWS({ type: 'parro/accounts', ...(this._source === 'messages' ? { source: 'messages' } : {}) });
+      if (epoch !== this._epoch) return;
+      this._accounts = Array.isArray(result?.accounts) ? result.accounts : [];
+    } catch (error) { if (epoch === this._epoch) this._accountError = errorCode(error); }
+    if (epoch === this._epoch) this._renderControls();
+  }
+  _renderControls() {
+    const t = words(this._hass);
+    const device = deviceForAccount(this._hass, this._account);
+    const back = internalLink(device ? t.backDevice : t.backIntegration, device ? `/config/devices/device/${encodeURIComponent(device)}` : '/config/integrations/integration/parro');
+    back.className = 'icon-button'; back.setAttribute('aria-label', device ? t.backDevice : t.backIntegration); back.title = back.getAttribute('aria-label'); back.replaceChildren(icon('arrow-left'));
+    this._toolbar.replaceChildren(back, el('h1', '', 'Parro'));
+    const tabs = el('div', 'tabs'); tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', t.source);
+    for (const [source, label] of [['announcements', t.announcements], ['messages', t.conversations]]) {
+      const tab = button(label, () => { this._source = source; this._sync(); this.shadowRoot.querySelector(`#tab-${source}`)?.focus(); }, 'tab');
+      tab.textContent = label; tab.id = `tab-${source}`; tab.setAttribute('role', 'tab'); tab.setAttribute('aria-selected', String(source === this._source)); tab.setAttribute('aria-controls', 'parro-content'); tab.tabIndex = source === this._source ? 0 : -1;
+      tab.addEventListener('keydown', (event) => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); this._source = event.key === 'Home' ? 'announcements' : event.key === 'End' ? 'messages' : source === 'messages' ? 'announcements' : 'messages'; this._sync(); this.shadowRoot.querySelector(`#tab-${this._source}`)?.focus(); } }); tabs.append(tab);
+    }
+    this._card.setAttribute('aria-labelledby', `tab-${this._source}`);
+    this._controls.replaceChildren(tabs);
+    if (!this._routeAccount()) {
+      const field = el('div', 'panel-account'); const label = el('label', '', t.account); label.htmlFor = 'panel-account';
+      const select = el('select'); select.id = 'panel-account'; const placeholder = el('option', '', t.choose); placeholder.value = ''; select.append(placeholder);
+      for (const account of this._accounts) { const option = el('option', '', safeText(account.title, 160) || 'Parro'); option.value = safeText(account.config_entry_id, 128); select.append(option); }
+      select.value = this._account; select.disabled = !this._accounts.length;
+      select.addEventListener('change', () => { this._account = select.value; this._syncCard(); this._renderControls(); }); field.append(label, select); this._controls.append(field);
+      if (this._accountError) { const error = el('p', 'notice', t[this._accountError]); error.setAttribute('role', 'alert'); this._controls.append(error); }
+    }
+  }
+}
+
 if (!customElements.get('parro-card')) customElements.define('parro-card', ParroCard);
 if (!customElements.get('parro-card-editor')) customElements.define('parro-card-editor', ParroCardEditor);
+if (!customElements.get('more-info-parro')) customElements.define('more-info-parro', MoreInfoParro);
+if (!customElements.get('parro-panel')) customElements.define('parro-panel', ParroPanel);
 window.customCards = window.customCards || [];
-if (!window.customCards.some((card) => card.type === 'parro-card')) window.customCards.push({ type: 'parro-card', name: 'Parro', description: 'School announcements and photos from your Parro account.', preview: false });
+if (!window.customCards.some((card) => card.type === 'parro-card')) window.customCards.push({ type: 'parro-card', name: 'Parro', description: 'School announcements, conversations and photos from your Parro account.', preview: false });

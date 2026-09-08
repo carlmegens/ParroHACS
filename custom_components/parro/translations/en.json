@@ -42,10 +42,12 @@
         "description": "Choose how often Home Assistant updates the counters (15–240 minutes). Announcements and photos are fetched when you open the card. Administrators always have access; select any additional users below.",
         "data": {
           "poll_interval": "Polling interval (minutes)",
-          "dashboard_viewers": "Access to announcements and photos"
+          "dashboard_viewers": "Access to announcements and photos",
+          "chat_viewers": "Family users with access to conversations"
         },
         "data_description": {
-          "dashboard_viewers": "These users may view announcements and photos from this Parro account. This does not grant access to private conversations."
+          "dashboard_viewers": "These users may view announcements and photos from this Parro account. This does not grant access to private conversations.",
+          "chat_viewers": "These users may view direct conversations and their photos from this Parro account. Grant this separately from announcement access."
         }
       }
     },

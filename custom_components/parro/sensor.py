@@ -42,6 +42,18 @@ class ParroCountSensor(ParroEntity, SensorEntity):
     ) -> None:
         super().__init__(coordinator, entry, description.key)
         self.entity_description = description
+        source = {
+            "unread_announcements": "announcements",
+            "unread_chatrooms": "messages",
+        }.get(description.key)
+        if source:
+            # HA's existing more-info hook receives only routing metadata. The
+            # component obtains private content through the authenticated API.
+            self._attr_extra_state_attributes = {
+                "custom_ui_more_info": "more-info-parro",
+                "parro_config_entry_id": entry.entry_id,
+                "parro_source": source,
+            }
 
     @property
     def native_value(self) -> int | None:

@@ -20,6 +20,7 @@ from .api import (
 )
 from .const import (
     CONF_ACCOUNT_ID,
+    CONF_CHAT_VIEWERS,
     CONF_DASHBOARD_VIEWERS,
     CONF_POLL_INTERVAL,
     CONF_TOKENS,
@@ -147,14 +148,17 @@ class ParroOptionsFlow(config_entries.OptionsFlow):
         user_ids = {user.id for user in users}
         errors: dict[str, str] = {}
         if user_input is not None:
-            viewers = user_input.get(CONF_DASHBOARD_VIEWERS, [])
-            if not isinstance(viewers, list) or any(viewer not in user_ids for viewer in viewers):
-                errors[CONF_DASHBOARD_VIEWERS] = "invalid_viewers"
-            else:
-                return self.async_create_entry(
-                    title="",
-                    data={**user_input, CONF_DASHBOARD_VIEWERS: list(dict.fromkeys(viewers))},
-                )
+            data = dict(user_input)
+            for key in (CONF_DASHBOARD_VIEWERS, CONF_CHAT_VIEWERS):
+                viewers = user_input.get(key, [])
+                if not isinstance(viewers, list) or any(
+                    viewer not in user_ids for viewer in viewers
+                ):
+                    errors[key] = "invalid_viewers"
+                else:
+                    data[key] = list(dict.fromkeys(viewers))
+            if not errors:
+                return self.async_create_entry(title="", data=data)
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
@@ -167,22 +171,26 @@ class ParroOptionsFlow(config_entries.OptionsFlow):
                     ): vol.All(
                         vol.Coerce(int), vol.Range(min=MIN_POLL_INTERVAL, max=MAX_POLL_INTERVAL)
                     ),
-                    vol.Optional(
-                        CONF_DASHBOARD_VIEWERS,
-                        default=[
-                            viewer
-                            for viewer in self.config_entry.options.get(CONF_DASHBOARD_VIEWERS, [])
-                            if viewer in user_ids
-                        ],
-                    ): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=[
-                                {"value": user.id, "label": user.name or user.id} for user in users
+                    **{
+                        vol.Optional(
+                            key,
+                            default=[
+                                viewer
+                                for viewer in self.config_entry.options.get(key, [])
+                                if viewer in user_ids
                             ],
-                            multiple=True,
-                            mode=selector.SelectSelectorMode.DROPDOWN,
+                        ): selector.SelectSelector(
+                            selector.SelectSelectorConfig(
+                                options=[
+                                    {"value": user.id, "label": user.name or user.id}
+                                    for user in users
+                                ],
+                                multiple=True,
+                                mode=selector.SelectSelectorMode.DROPDOWN,
+                            )
                         )
-                    ),
+                        for key in (CONF_DASHBOARD_VIEWERS, CONF_CHAT_VIEWERS)
+                    },
                 }
             ),
             errors=errors,

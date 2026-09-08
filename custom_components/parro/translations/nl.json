@@ -42,10 +42,12 @@
         "description": "Kies hoe vaak Home Assistant de tellers bijwerkt (15–240 minuten). Mededelingen en foto’s worden opgehaald wanneer je de kaart opent. Beheerders hebben altijd toegang; selecteer hieronder eventuele andere gebruikers.",
         "data": {
           "poll_interval": "Ophaalinterval (minuten)",
-          "dashboard_viewers": "Toegang tot mededelingen en foto’s"
+          "dashboard_viewers": "Toegang tot mededelingen en foto’s",
+          "chat_viewers": "Gezinsgebruikers met toegang tot gesprekken"
         },
         "data_description": {
-          "dashboard_viewers": "Deze gebruikers mogen mededelingen en foto’s van dit Parro-account bekijken. Dit geeft geen toegang tot privégesprekken."
+          "dashboard_viewers": "Deze gebruikers mogen mededelingen en foto’s van dit Parro-account bekijken. Dit geeft geen toegang tot privégesprekken.",
+          "chat_viewers": "Deze gebruikers mogen directe gesprekken en bijbehorende foto’s van dit Parro-account bekijken. Selecteer dit apart van toegang tot mededelingen."
         }
       }
     },

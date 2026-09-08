@@ -23,4 +23,5 @@ class ParroEntity(CoordinatorEntity[ParroCoordinator]):
             manufacturer="Parro",
             model="School account",
             entry_type=DeviceEntryType.SERVICE,
+            configuration_url=f"homeassistant://parro/{entry.entry_id}",
         )

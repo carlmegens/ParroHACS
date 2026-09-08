@@ -2,6 +2,8 @@
 
 [dashboard.yaml](dashboard.yaml) is een zelfstandig, generiek dashboard met één Parro-kaart. Het bevat geen accounts, foto's of schoolberichten. De integratie en kaart worden samen geïnstalleerd vanuit [ParroHACS](https://github.com/carlmegens/ParroHACS).
 
+Dit voorbeeld is optioneel. Vanaf versie 0.3.0 open je mededelingen en gesprekken rechtstreeks via de bestaande tellers op het Parro-apparaat. Daarvoor hoef je geen dashboard aan te maken.
+
 ## Via de dashboardeditor
 
 1. Installeer Parro en meld een account aan volgens de [installatiehandleiding](../README.md#installeren-via-hacs).
@@ -30,19 +32,21 @@ Voor bestaande YAML-dashboards kun je dezelfde inhoud als apart dashboardbestand
 | `type` | Altijd `custom:parro-card`. |
 | `config_entry_id` | Vereist om inhoud op te halen; kies het eigen Parro-account in de editor. |
 | `title` | Titel boven de mededelingen. |
-| `limit` | Aantal mededelingen, 1–20; het voorbeeld gebruikt 5. |
+| `limit` | Aantal mededelingen of berichten, 1–20; het voorbeeld gebruikt 5. |
 | `show_images` | `true` toont beschikbare foto's; `false` laat ze weg. |
 | `group_id` | Optioneel: filter op één groep van het gekozen account. |
+| `source` | Optioneel: `announcements` (standaard) of `messages`. Gesprekken vereisen afzonderlijk verleende toegang. |
+| `chatroom_id` | Optioneel bij `source: messages`: positief numeriek gespreks-ID als tekenreeks, afkomstig uit de gesprekken van dit account. |
 
-De groepsfilter werkt binnen de begrensd opgehaalde selectie. Een lege lijst bewijst niet dat de groep nooit mededelingen heeft gehad. De kaart is bedoeld voor mededelingen en foto's; de bestaande leesacties blijven beschikbaar voor gesprekken.
+De groepsfilter werkt binnen de begrensd opgehaalde selectie. Een lege lijst bewijst niet dat de groep nooit mededelingen heeft gehad. Dit voorbeeld toont mededelingen en foto's; gesprekken zijn ook vanuit het Parro-apparaat te openen.
 
 ## Als de kaart niet verschijnt
 
 In dashboards met opslag via de Home Assistant-interface registreert de integratie de kaartresource automatisch. Herlaad de pagina na installatie of een update. Controleer zo nodig de dashboardresources en voeg deze JavaScript-module eenmaal toe:
 
 ```yaml
-url: /parro_static/parro-card.js?v=0.2.0
+url: /parro_static/parro-card.js?v=0.3.0
 type: module
 ```
 
-Bij resources die je in YAML beheert, voeg je deze module toe aan de bestaande lijst met dashboardresources. De resource hoort bij de geïnstalleerde integratie; een aparte HACS-repository voor de kaart is niet nodig. Zie de [resource-instructies](../README.md#kaartresource-controleren).
+Bij resources die je in YAML beheert, voeg je deze module toe aan de bestaande lijst met dashboardresources. De resource hoort bij de geïnstalleerde integratie; een aparte HACS-repository voor de kaart is niet nodig. Zie de [resource-instructies](../README.md#meegeleverde-weergave-controleren).

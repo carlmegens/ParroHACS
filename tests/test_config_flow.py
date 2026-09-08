@@ -224,3 +224,34 @@ async def test_options_only_lists_eligible_users(
     for user_id in [hass_admin_user.id, hass_supervisor_user.id, disabled.id, "unknown"]:
         with pytest.raises(vol.Invalid):
             schema({"poll_interval": 30, "dashboard_viewers": [user_id]})
+
+
+async def test_chat_viewers_are_opt_in_and_can_be_revoked(hass, config_entry, hass_read_only_user):
+    config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(
+        config_entry, options={"dashboard_viewers": [hass_read_only_user.id]}
+    )
+    result = await hass.config_entries.options.async_init(config_entry.entry_id)
+    assert result["data_schema"]({"poll_interval": 30})["chat_viewers"] == []
+    await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {"poll_interval": 30, "dashboard_viewers": [], "chat_viewers": [hass_read_only_user.id]},
+    )
+    assert config_entry.options["chat_viewers"] == [hass_read_only_user.id]
+    assert config_entry.options["dashboard_viewers"] == []
+    result = await hass.config_entries.options.async_init(config_entry.entry_id)
+    await hass.config_entries.options.async_configure(
+        result["flow_id"], {"poll_interval": 30, "chat_viewers": []}
+    )
+    assert config_entry.options["chat_viewers"] == []
+
+
+async def test_chat_viewers_revalidated_on_submit(hass, config_entry, hass_read_only_user):
+    config_entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(config_entry.entry_id)
+    await hass.auth.async_update_user(hass_read_only_user, is_active=False)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"poll_interval": 30, "chat_viewers": [hass_read_only_user.id]}
+    )
+    assert result["errors"] == {"chat_viewers": "invalid_viewers"}
+    assert not config_entry.options

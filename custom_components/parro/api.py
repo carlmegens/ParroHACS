@@ -24,7 +24,7 @@ from urllib.parse import parse_qs, urljoin, urlparse
 import httpx
 from homeassistant.core import HomeAssistant
 
-from .const import DEFAULT_LIMIT, MAX_LIMIT
+from .const import DEFAULT_LIMIT, MAX_FEED_LIMIT, MAX_LIMIT
 
 
 class ParroError(Exception):
@@ -167,6 +167,43 @@ def _limit(limit: int) -> int:
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_LIMIT:
         raise ParroError(f"Limit must be between 1 and {MAX_LIMIT}")
     return limit
+
+
+def _image_sources(attachments: Any) -> list[dict[str, str | None]]:
+    """Keep only bounded image sources, for the private in-memory feeds."""
+    sources = []
+    for attachment in attachments[:MAX_LIMIT] if isinstance(attachments, list) else []:
+        if (
+            not isinstance(attachment, dict)
+            or str(attachment.get("attachmentType", "")).lower() != "image"
+        ):
+            continue
+        entries = attachment.get("entries", [])
+        for entry in entries[:10] if isinstance(entries, list) else []:
+            if not isinstance(entry, dict) or entry.get("type") != "SOURCE":
+                continue
+            url = entry.get("url")
+            if isinstance(url, str) and 0 < len(url) <= 8192:
+                sources.append(
+                    {
+                        "url": url,
+                        "name": _text(attachment.get("name", attachment.get("filename")), 256),
+                    }
+                )
+                break
+        if len(sources) == 3:
+            break
+    return sources
+
+
+def _chatroom(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": _id(item),
+        "title": _text(item.get("title", item.get("subject", item.get("name"))), 1000),
+        "type": _text(item.get("type"), 100),
+        "sort_date": _text(item.get("sortDate"), 100),
+        "unread_count": _number(item.get("unreadCount")),
+    }
 
 
 def _sdk_module() -> ModuleType:
@@ -574,31 +611,6 @@ class ParroApi:
             )
             items = []
             for item in announcements[:limit]:
-                sources = []
-                attachments = item.get("attachments", [])
-                for attachment in attachments[:MAX_LIMIT] if isinstance(attachments, list) else []:
-                    if (
-                        not isinstance(attachment, dict)
-                        or str(attachment.get("attachmentType", "")).lower() != "image"
-                    ):
-                        continue
-                    entries = attachment.get("entries", [])
-                    for entry in entries[:10] if isinstance(entries, list) else []:
-                        if not isinstance(entry, dict) or entry.get("type") != "SOURCE":
-                            continue
-                        url = entry.get("url")
-                        if isinstance(url, str) and 0 < len(url) <= 8192:
-                            sources.append(
-                                {
-                                    "url": url,
-                                    "name": _text(
-                                        attachment.get("name", attachment.get("filename")), 256
-                                    ),
-                                }
-                            )
-                            break
-                    if len(sources) == 3:
-                        break
                 items.append(
                     {
                         "id": _id(item),
@@ -608,7 +620,7 @@ class ParroApi:
                         "sort_date": _text(item.get("sortDate"), 100),
                         "sender": _name(item.get("owner")),
                         "group_id": _id(item, "group") or group_id,
-                        "image_sources": sources,
+                        "image_sources": _image_sources(item.get("attachments")),
                     }
                 )
             return {"items": items, "groups": groups}
@@ -618,16 +630,57 @@ class ParroApi:
     async def async_get_chatrooms(self, limit: int = DEFAULT_LIMIT) -> list[dict[str, Any]]:
         limit = _limit(limit)
         items = await self._async_call(lambda client: client._items_paged("/chatroom", limit))
-        return [
-            {
-                "id": _id(item),
-                "title": _text(item.get("title", item.get("subject", item.get("name"))), 1000),
-                "type": _text(item.get("type"), 100),
-                "sort_date": _text(item.get("sortDate"), 100),
-                "unread_count": _number(item.get("unreadCount")),
-            }
-            for item in items[:limit]
-        ]
+        return [_chatroom(item) for item in items[:limit]]
+
+    async def _async_fetch_chat_source(
+        self, chatroom_id: str, limit: int = DEFAULT_LIMIT
+    ) -> dict[str, Any]:
+        """Validate account membership and fetch one bounded private chat source.
+
+        The public Parro web app's RChatTextMessage model has a singular
+        attachment: RChatMessageAttachment, inheriting attachmentType/entries.
+        Only the private chat feed consumes these URLs; actions stay unchanged.
+        """
+        if type(limit) is not int or not 1 <= limit <= MAX_FEED_LIMIT:
+            raise ParroError("The Parro message limit must be between 1 and 20")
+        if (
+            not isinstance(chatroom_id, str)
+            or not re.fullmatch(r"[0-9]{1,20}", chatroom_id)
+            or int(chatroom_id) <= 0
+        ):
+            raise ParroError("The selected Parro conversation is unavailable")
+
+        def fetch(client: Any) -> dict[str, Any]:
+            conversations = [
+                _chatroom(item) for item in client._items_paged("/chatroom", MAX_LIMIT)[:MAX_LIMIT]
+            ]
+            conversation = next((item for item in conversations if item["id"] == chatroom_id), None)
+            if conversation is None:
+                raise ParroError("The selected Parro conversation is unavailable")
+            messages = client.get_chat_messages(int(chatroom_id), limit=limit)
+            items = []
+            for item in messages[:limit]:
+                if item.get("deleted") is True:
+                    continue
+                attachment = item.get("attachment")
+                items.append(
+                    {
+                        "id": _id(item),
+                        "contents": _text(item.get("text", item.get("contents"))),
+                        "sender": _name(item.get("identity")),
+                        "created_at": _text(item.get("createdAt"), 100),
+                        "sort_date": _text(
+                            item.get("sortDate")
+                            or item.get("createdAt")
+                            or item.get("lastModifiedAt"),
+                            100,
+                        ),
+                        "image_sources": _image_sources([attachment]),
+                    }
+                )
+            return {"items": items, "conversation": conversation, "conversations": conversations}
+
+        return await self._async_call(fetch)
 
     async def async_get_messages(
         self, chatroom_id: str | int, limit: int = DEFAULT_LIMIT

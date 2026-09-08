@@ -51,6 +51,7 @@ REQUIRED_FILES = {
             "frontend.py",
             "sensor.py",
             "binary_sensor.py",
+            "chat_feed.py",
             "services.py",
             "services.yaml",
             "diagnostics.py",
