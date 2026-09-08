@@ -1,5 +1,10 @@
 # Wijzigingen
 
+## 0.3.1 — Parro-logo
+
+- Vervangt het tijdelijke blauwe P-pictogram door het aangeleverde kleurrijke Parro-logo. De transparante afbeelding wordt lokaal met de integratie meegeleverd.
+- Geen wijzigingen aan aanmelding, sensoren, berichten, foto’s of toegangsrechten.
+
 ## 0.3.0 — lezen vanuit het Parro-apparaat
 
 - De bestaande tellers **Ongelezen mededelingen** en **Ongelezen gesprekken** openen de passende Parro-pop-up. Er zijn geen extra entiteiten of een afzonderlijk dashboard nodig.
